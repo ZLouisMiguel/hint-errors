@@ -1,1 +1,1 @@
-# hint
+# hint-errors
