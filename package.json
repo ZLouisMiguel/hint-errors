@@ -1,0 +1,13 @@
+{
+  "name": "hint",
+  "version": "1.0.0",
+  "description": "A package that helps translate errors in a way that's more dev friendly to read and understand for easier, faster debugging",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
