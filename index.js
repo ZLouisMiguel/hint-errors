@@ -3,4 +3,4 @@ function isWDS(string) {
   return string.toUpperCase() === "WDS" || string.toLowerCase() === "wds";
 }
 
-module.exports = isWDS;
+module.exports = { isWDS };
