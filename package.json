@@ -7,7 +7,11 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Louis",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZLouisMiguel/hint.git"
+  },
   "license": "ISC",
   "type": "commonjs"
 }
