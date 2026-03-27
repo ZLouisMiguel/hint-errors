@@ -1,6 +1,21 @@
-function isWDS(string) {
-  if (string.length > 3) return false;
-  return string.toUpperCase() === "WDS" || string.toLowerCase() === "wds";
+const { parseError } = require("parser.js");
+const { getHint } = require("hints.js");
+const { formatError } = require("formatter.js");
+
+function handle(err) {
+  const parsed = parseError(err);
+  const hint = getHint(parsed);
+  formatError(parsed, hint);
 }
 
-module.exports = { isWDS };
+
+process.on("UncaughtException", (err)=> {
+  handle(err);
+  process.exit(1);
+})
+
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  handle(err);
+  process.exit(1);
+});
