@@ -1,6 +1,6 @@
-const { parseError } = require("parser.js");
-const { getHint } = require("hints.js");
-const { formatError } = require("formatter.js");
+const { parseError } = require("./src/parser.js");
+const { getHint } = require("./src/hints.js");
+const { formatError } = require("./src/formatter.js");
 
 function handle(err) {
   const parsed = parseError(err);
