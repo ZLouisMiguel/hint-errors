@@ -1,4 +1,25 @@
-// Maps a parsed error object to a developer-friendly hint.
+/**
+ * @fileoverview Maps parsed error objects to developer-friendly hint strings.
+ * Hints are matched against a combined string of the error type and message.
+ * The array is ordered from most specific to least specific — the first
+ * match wins, so specific entries must always appear before generic ones
+ * that would otherwise swallow them.
+ */
+
+/**
+ * @typedef {Object} HintEntry
+ * @property {string|RegExp} match - The string or regex to test against the
+ *   combined "ErrorType: error message" string.
+ * @property {string} hint - The developer-facing hint to display when matched.
+ */
+
+/**
+ * Ordered list of hint entries covering TypeErrors, ReferenceErrors,
+ * SyntaxErrors, RangeErrors, URIErrors, AssertionErrors, file system errors,
+ * network errors, and promise/async errors.
+ *
+ * @type {HintEntry[]}
+ */
 const hints = [
   // ─── TypeErrors ────────────────────────────────────────────────
   {
@@ -36,8 +57,7 @@ This often happens with objects that have parent/child references.
 Consider using a replacer function, or a library like flatted.`,
   },
   {
-    match:
-      /\.map is not a function|\.forEach is not a function|\.filter is not a function|\.reduce is not a function/,
+    match: /\.map is not a function|\.forEach is not a function|\.filter is not a function|\.reduce is not a function/,
     hint: `You're calling an array method on something that isn't an array.
 The value is likely undefined, null, or a different type entirely.
 Add a console.log on the value just before this line to see what it actually is.`,
@@ -79,12 +99,9 @@ Change your call from MyClass() to new MyClass().`,
   },
 
   // ─── ReferenceErrors ───────────────────────────────────────────
-  {
-    match: "is not defined",
-    hint: `You're using a variable or function that hasn't been declared yet.
-Check for typos in the name, make sure it's in scope, and that the
-file or module it lives in has been imported correctly.`,
-  },
+  // ⚠️  Specific matches MUST come before the generic "is not defined"
+  // entry below — hints.find() stops at the first match, and all of
+  // these strings also contain "is not defined".
   {
     match: "window is not defined",
     hint: `'window' is a browser-only global — it doesn't exist in Node.js.
@@ -108,6 +125,12 @@ or a package like node-localstorage.`,
     hint: `'fetch' is not available in older versions of Node.js (below v18).
 If you're on Node 18+, make sure you're not in a context where it's unavailable.
 Otherwise, install a polyfill like node-fetch: npm install node-fetch.`,
+  },
+  {
+    match: "is not defined",
+    hint: `You're using a variable or function that hasn't been declared yet.
+Check for typos in the name, make sure it's in scope, and that the
+file or module it lives in has been imported correctly.`,
   },
 
   // ─── SyntaxErrors ──────────────────────────────────────────────
@@ -310,6 +333,19 @@ A missing 'await' keyword is a very common cause of this.`,
   },
 ];
 
+/**
+ * Looks up a developer hint for a given parsed error object.
+ *
+ * Combines the error type and message into a single string and tests it
+ * against each entry in the hints array in order, returning the hint from
+ * the first match found. Falls back to a generic actionable message if
+ * no specific hint matches.
+ *
+ * @param {Object} parsed - The structured error object produced by parseError().
+ * @param {string} parsed.type - The error type name (e.g. "TypeError").
+ * @param {string} parsed.message - The error message string.
+ * @returns {string} A developer-friendly hint string.
+ */
 function getHint(parsed) {
   const combined = `${parsed.type}: ${parsed.message}`;
 
