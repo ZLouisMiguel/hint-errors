@@ -4,7 +4,7 @@
 
 ```
 ────────────────────────────────────────────────────────────────────
-  ❌  TypeError
+  ❌ TypeError
      Cannot read properties of undefined (reading 'name')
 
   📍  server.js  ·  line 42
@@ -49,13 +49,15 @@ npm install hint-errors
 
 ## Usage
 
+### Scripts and short-lived processes
+
 Add one line to the top of your entry file.
 
 ```js
 require("hint-errors");
 ```
 
-That's it. hint-errors hooks into Node's global process events the moment it's required. Every uncaught error and unhandled Promise rejection anywhere in your app gets intercepted automatically — no wrapping, no configuration, no changes to existing code.
+That's it. hint-errors hooks into Node's global process events the moment it's required. Every uncaught error and unhandled Promise rejection anywhere in your app gets intercepted automatically no wrapping, no configuration, no changes to existing code.
 
 ```js
 // entry.js
@@ -64,6 +66,31 @@ require("hint-errors");
 const app = require("./app");
 app.start();
 ```
+
+### Servers and long-running processes
+
+By default hint-errors exits the process after showing a hint the right behavior for scripts. For servers you opt in to a mode that shows the hint but keeps the process alive so a single bad request doesn't take down every other user.
+
+```js
+// server.js
+require("hint-errors/server");
+
+const http = require("http");
+const app = require("./app");
+
+http.createServer(app).listen(3000);
+```
+
+When server mode is active you'll see this warning in your terminal so the behavior is never silent:
+
+```
+[hint-errors] server mode active process will stay alive after uncaught errors
+```
+
+| Entry point                     | Process after error | Use for                              |
+| ------------------------------- | ------------------- | ------------------------------------ |
+| `require('hint-errors')`        | Exits with code 1   | Scripts, CLIs, short-lived processes |
+| `require('hint-errors/server')` | Stays alive         | HTTP servers, long-running processes |
 
 ---
 
@@ -121,13 +148,13 @@ app.start();
 
 ```
 hint-errors/
-├── index.js          ← activates on require, registers process listeners
+├── index.js          ← default entry point, exits after showing hint
+├── server.js         ← server mode entry point, stays alive after showing hint
 ├── src/
 │   ├── parser.js     ← pulls structured data out of raw Error objects
 │   ├── hints.js      ← matches errors to hint strings
 │   └── formatter.js  ← renders the terminal output
-└── test/
-    └── script.js
+└──
 ```
 
 ---
