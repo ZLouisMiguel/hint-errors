@@ -47,7 +47,7 @@ function formatError(parsed, hint) {
     "\n" + divider,
   ].join("");
 
-  process.stderr.write(output + "\n");
+  process.stdout.write(output + "\n");
 }
 
 module.exports = { formatError };

@@ -6,11 +6,9 @@ function handle(err) {
   const parsed = parseError(err);
   const hint = getHint(parsed);
   formatError(parsed, hint);
-
-  process.stderr.write = () => {};
 }
 
-process.on("UncaughtException", (err) => {
+process.on("uncaughtException", (err) => {
   handle(err);
   process.exit(1);
 });
