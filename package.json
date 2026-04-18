@@ -1,11 +1,16 @@
 {
   "name": "hint-errors",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Readable, actionable error output for Node.js — know what broke, where it broke, and what to do about it.",
   "main": "index.js",
   "type": "commonjs",
+  "exports": {
+    ".": "./index.js",
+    "./server": "./server.js"
+  },
   "files": [
     "index.js",
+    "server.js",
     "src/",
     "README.md"
   ],

@@ -7,6 +7,21 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] - 2026-04-18
+
+### Added
+
+- `server.js` — opt-in server mode entry point via `require('hint-errors/server')`.
+  Identical pipeline to `index.js` but omits `process.exit(1)` so long-running
+  servers survive uncaught errors in individual request handlers without taking
+  down the entire process
+- `exports` field in `package.json` exposing both `.` and `./server` as valid
+  import paths so Node resolves `hint-errors/server` correctly
+- Console warning on server mode activation so silent error survival doesn't
+  go unnoticed during development
+
+---
+
 ## [1.0.0] - 2026-04-18
 
 ### Added
@@ -29,4 +44,5 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.1.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.0.0
