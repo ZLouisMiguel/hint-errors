@@ -11,8 +11,11 @@ const c = {
 
 function shortenPath(filePath) {
   if (!filePath) return "unkown location";
-  const cwd = process.cwd();
-  return filePath.startsWith(cwd) ? filePath.slice(cwd.length + 1) : filePath;
+  const cwd = process.cwd().toLowerCase();
+  const normalizedFile = filePath.toLowerCase();
+  return normalizedFile.startsWith(cwd)
+    ? filePath.slice(cwd.length + 1)
+    : filePath;
 }
 
 function indentLines(text, prefix) {
