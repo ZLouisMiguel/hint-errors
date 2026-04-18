@@ -1,17 +1,45 @@
 {
   "name": "hint-errors",
   "version": "1.0.0",
-  "description": "A package that helps translate errors in a way that's more dev friendly to read and understand for easier, faster debugging",
+  "description": "Readable, actionable error output for Node.js — know what broke, where it broke, and what to do about it.",
   "main": "index.js",
+  "type": "commonjs",
+  "files": [
+    "index.js",
+    "src/",
+    "README.md"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/script.js"
   },
-  "keywords": [],
-  "author": "Louis",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ZLouisMiguel/hint.git"
+  "keywords": [
+    "error",
+    "errors",
+    "debugging",
+    "developer-experience",
+    "dx",
+    "hint",
+    "readable",
+    "stack-trace",
+    "nodejs",
+    "error-handling",
+    "uncaught-exception",
+    "error-messages",
+    "beginner-friendly"
+  ],
+  "author": {
+    "name": "Louis"
   },
   "license": "ISC",
-  "type": "commonjs"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZLouisMiguel/hint-errors.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ZLouisMiguel/hint-errors/issues"
+  },
+  "homepage": "https://github.com/ZLouisMiguel/hint-errors#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }
