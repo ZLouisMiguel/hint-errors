@@ -96,4 +96,4 @@ Verify the correct hint appears.
 
 ## Questions?
 
-Open an issue or tag [@ZLouisMiguel](https://github.com/ZLouisMiguel).
+Open an issue or tag [@ZLouisMiguel](https://github.com/ZLouisMiguel) or any other listed maintainer.
