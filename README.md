@@ -1,6 +1,6 @@
 # hint-errors
 
-> Readable errors, Faster Debugging
+> JavaScript errors done right 
 
 ## Install
 
