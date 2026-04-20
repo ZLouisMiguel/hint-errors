@@ -7,6 +7,18 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.2] - 2026-04-20
+
+### Changed
+
+- `formatter.js` — replaced block-style terminal output with a compact
+  key/value layout. Each field (`error`, `message`, `location`, `hint`) renders
+  on its own line with keys dim-colored and left-aligned to a fixed column width.
+  Multi-line hint values are indented to the same column so all values share a
+  consistent left edge. Divider lines and decorative icons removed.
+
+---
+
 ## [1.1.0] - 2026-04-18
 
 ### Added
@@ -44,5 +56,6 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.1.2]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.2
 [1.1.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.0.0
