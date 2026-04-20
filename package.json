@@ -1,7 +1,7 @@
 {
   "name": "hint-errors",
-  "version": "1.1.0",
-  "description": "Readable, actionable error output for Node.js — know what broke, where it broke, and what to do about it.",
+  "version": "1.1.1",
+  "description": "Readable Errors, Faster Debugging",
   "main": "index.js",
   "type": "commonjs",
   "exports": {
