@@ -77,30 +77,27 @@ function indentLines(text, prefix) {
  * @returns {void}
  */
 function formatError(parsed, hint) {
-  const width = process.stdout.columns || 50;
-  const divider = c.dim + "─".repeat(width) + c.reset;
-
-  const typeLine = `\n  ${c.red}${c.bold} ${parsed.type}${c.reset}`;
-  const messageLine = `\n  ${c.dim}${parsed.message}${c.reset}`;
-
   const file = shortenPath(parsed.file);
-  const locationLine = parsed.file
-    ? `\n\n  ${c.yellow}📍  ${file}${c.reset}${c.dim}  ·  line ${parsed.line}${c.reset}`
-    : `\n\n  ${c.yellow}📍  unknown location${c.reset}`;
+  const location = parsed.line ? `${file}: line ${parsed.line}` : file;
 
-  const hintBody = indentLines(hint, "     ");
-  const hintLine = `\n\n  ${c.cyan}${c.bold} 💡${c.reset}\n${c.cyan}${hintBody}${c.reset}`;
+  const fields = [
+    { key: "error", value: parsed.type, color: c.red },
+    { key: "message", value: parsed.message, color: c.bold },
+    { key: "location", value: location, color: c.yellow },
+    { key: "hint", value: hint, color: c.cyan },
+  ];
 
-  const output = [
-    divider,
-    typeLine,
-    messageLine,
-    locationLine,
-    hintLine,
-    "\n" + divider,
-  ].join("");
+  const keywidth = Math.max(...fields.map((f) => f.key.length));
+  const valueIndent = " ".repeat(2 + keywidth);
 
-  process.stdout.write(output + "\n");
+  const lines = fields.map(({ key, value, color }) => {
+    const paddedKey = key.padEnd(keywidth);
+    const continuationIndent = `${c.reset}${valueIndent}${color}`;
+    const indentedValue = value.split("\n").join(`\n${continuationIndent}`);
+
+    return ` ${c.dim}${paddedKey}${c.reset} ${color}${indentedValue}${c.reset} `;
+  });
+  process.stdout.write("\n" + lines.join("\n") + "\n\n");
 }
 
 module.exports = { formatError };
