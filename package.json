@@ -1,7 +1,7 @@
 {
   "name": "hint-errors",
-  "version": "1.1.1",
-  "description": "Readable Errors, Faster Debugging",
+  "version": "1.1.2",
+  "description": "JavaScript errors done right",
   "main": "index.js",
   "type": "commonjs",
   "exports": {
