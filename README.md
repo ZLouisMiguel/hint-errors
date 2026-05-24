@@ -9,15 +9,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/hint-errors.svg" alt="license" /></a>
 </p>
 
----
 
 ## Install
 
 ```bash
 npm install hint-errors
 ```
-
----
 
 ## Usage
 
@@ -53,8 +50,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(3000);
 ```
-
----
 
 ## What's covered
 
@@ -97,7 +92,6 @@ server.listen(3000);
 - Unhandled rejection inside `async/await`
 - Missing `await` causing undefined reads
 
----
 
 ## Maintainers
 
