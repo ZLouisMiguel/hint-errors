@@ -23,10 +23,12 @@ const c = {
 
 /**
  * Shortens an absolute file path to be relative to the current working
- * directory. Comparison is done case-insensitively to handle Windows drive
- * letter casing differences (e.g. process.cwd() returns "F:\" but the stack
- * trace path may start with "f:\"). The returned path preserves the
- * original casing of the input.
+ * directory. A path is only shortened when it actually lives inside cwd —
+ * matching is done on a path boundary so a sibling directory that merely
+ * shares a prefix with cwd (e.g. cwd "app" vs "apple/") is never truncated.
+ * Comparison is done case-insensitively to handle Windows drive letter casing
+ * differences (e.g. process.cwd() returns "F:\" but the stack trace path may
+ * start with "f:\"). The returned path preserves the original casing.
  *
  * @param {string|null} filePath - The absolute file path extracted from the stack trace.
  * @returns {string} The path relative to cwd, or the original path if it falls
@@ -34,11 +36,24 @@ const c = {
  */
 function shortenPath(filePath) {
   if (!filePath) return "unknown location";
-  const cwd = process.cwd().toLowerCase();
-  const normalizedFile = filePath.toLowerCase();
-  return normalizedFile.startsWith(cwd)
-    ? filePath.slice(cwd.length + 1)
-    : filePath;
+  const cwd = process.cwd();
+  const cwdLower = cwd.toLowerCase();
+  const fileLower = filePath.toLowerCase();
+
+  if (!fileLower.startsWith(cwdLower)) return filePath;
+
+  // A path must actually live inside cwd to be shortened. When cwd does not
+  // end in a separator, the next character must be one — this prevents a
+  // sibling directory that merely shares a textual prefix with cwd (e.g. cwd
+  // "app" vs "apple/") from having its leading characters silently chopped.
+  const cwdEndsWithSeparator = cwd.endsWith("/") || cwd.endsWith("\\");
+  const rest = fileLower.slice(cwdLower.length);
+  if (rest === "") return filePath;
+  if (!cwdEndsWithSeparator && rest[0] !== "/" && rest[0] !== "\\") {
+    return filePath;
+  }
+
+  return filePath.slice(cwdLower.length + (cwdEndsWithSeparator ? 0 : 1));
 }
 
 /**
