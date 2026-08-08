@@ -41,13 +41,15 @@ function handle(err) {
 /**
  * Handles synchronous uncaught exceptions — errors that were thrown
  * somewhere in the codebase but never caught by a try/catch block.
- * process.exit(1) is called after formatting because Node's own docs
- * state the process should not continue after an uncaughtException as
- * the application is in an undefined state.
+ * The exit code is set to 1 after formatting and the process is left to
+ * drain naturally instead of calling process.exit(1): calling process.exit()
+ * can terminate the process before async stdout writes (e.g. when piped)
+ * have flushed, silently dropping the hint. Node.js docs recommend setting
+ * process.exitCode and letting the event loop drain for this reason.
  */
 process.on("uncaughtException", (err) => {
   handle(err);
-  process.exit(1);
+  process.exitCode = 1;
 });
 
 /**
@@ -55,9 +57,11 @@ process.on("uncaughtException", (err) => {
  * with no .catch() handler or try/catch around their await call.
  * The rejection reason can technically be any value, so non-Error reasons
  * are normalized into a real Error object before being passed to handle().
+ * Same exit strategy as uncaughtException: set the exit code and let the
+ * event loop drain so stdout is not truncated.
  */
 process.on("unhandledRejection", (reason) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
   handle(err);
-  process.exit(1);
+  process.exitCode = 1;
 });
