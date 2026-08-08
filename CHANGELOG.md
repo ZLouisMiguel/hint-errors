@@ -7,6 +7,33 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Zero-dependency test suite (`test/run.js`) that `npm test` now runs. Covers
+  the parser, hint matching, formatter, and both entry points (index + server).
+
+### Fixed
+
+- `npm test` failed out of the box: the `test` directory was gitignored and
+  `package.json` pointed at a test script that did not exist. The `.gitignore`
+  entry and the `test` script now reference the real suite.
+- `formatter.js` — a file path was shortened if it merely shared a textual
+  prefix with the current working directory (e.g. cwd `app` and file
+  `apple/x.js`). Paths are now only shortened when the file actually lives
+  inside cwd, checked on a path boundary.
+- `hints.js` — removed two hint entries that could never match:
+  `UnhandledPromiseRejection` (the rejection reason, never that literal string,
+  reaches `getHint`) and an `async`-specific undefined-read regex (no thrown
+  message can contain both "Cannot read" and "async").
+- `index.js` — stdout output was truncated when piped (e.g. `node script.js | cat`)
+  because `process.exit(1)` killed the process before buffered stdout flushed.
+  The exit code is now set via `process.exitCode` and the event loop is left to
+  drain, which Node.js docs recommend for exactly this reason.
+
+---
+
 ## [1.1.2] - 2026-04-20
 
 ### Changed
