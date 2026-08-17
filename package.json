@@ -15,7 +15,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/script.js"
+    "test": "node test/run.js"
   },
   "keywords": [
     "error",

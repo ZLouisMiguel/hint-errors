@@ -320,17 +320,6 @@ Check that the IP or hostname is correct and that your machine can reach that ne
   },
 
   // ─── Promises / Async ──────────────────────────────────────────
-  {
-    match: "UnhandledPromiseRejection",
-    hint: `A promise was rejected but nothing caught the error.
-Add a .catch() to your promise chain, or wrap your await call in a try/catch block.`,
-  },
-  {
-    match: /Cannot read.*of undefined.*async|async.*Cannot read.*of undefined/,
-    hint: `This error happened inside an async function — the value you're reading is undefined.
-Make sure you're awaiting the function that returns the data before trying to use it.
-A missing 'await' keyword is a very common cause of this.`,
-  },
 ];
 
 /**

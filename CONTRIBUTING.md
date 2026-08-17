@@ -27,7 +27,7 @@ hint-errors/
 │   ├── parser.js     # extracts file, line, type from raw Error
 │   ├── hints.js      # matches errors to hints (ordered array)
 │   └── formatter.js  # renders the terminal output
-└── test/             # (add your own test files)
+└── test/             # test suite – run with `npm test`
 ```
 
 ## Adding a new hint
@@ -72,13 +72,16 @@ require("../index.js");
 // code that throws the error you're targeting
 ```
 
-Run it:
+Run the whole suite:
 
 ```bash
-node test/your-test.js
+npm test
 ```
 
-Verify the correct hint appears.
+Any `*.test.js` file inside `test/` is picked up automatically by the
+zero-dependency runner (`test/run.js`). Add one `test(...)` block per
+assertion — the runner prints a pass/fail report and exits non-zero on failure.
+Manually verify the correct hint appears for a quick check while writing it.
 
 ## Code style
 
