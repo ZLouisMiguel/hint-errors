@@ -9,6 +9,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet — see the [1.2.0 milestone](https://github.com/ZLouisMiguel/hint-errors/milestone/1) for planned work (production safety guard, listener chaining, `NO_COLOR`/TTY detection, ESM-aware stack parsing).
+
+---
+
+## [1.1.3] - 2026-08-17
+
 ### Added
 
 - Zero-dependency test suite (`test/run.js`) that `npm test` now runs. Covers
@@ -83,6 +89,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.1.3]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.3
 [1.1.2]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.2
 [1.1.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.0.0
