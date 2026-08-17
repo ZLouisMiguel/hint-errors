@@ -9,7 +9,44 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet — see the [1.2.0 milestone](https://github.com/ZLouisMiguel/hint-errors/milestone/1) for planned work (production safety guard, listener chaining, `NO_COLOR`/TTY detection, ESM-aware stack parsing).
+---
+
+## [1.2.0] - 2026-08-17
+
+### Added
+
+- **Production safety guard** — both `index.js` and `server.js` now disable
+  themselves entirely when `NODE_ENV=production`, registering no listeners
+  at all. This closes a real reliability gap: a dev tool left in a
+  production entry file could previously intercept uncaught exceptions in
+  prod, including in `server.js`, which is explicitly designed to keep the
+  process alive after an error — masking failures instead of surfacing
+  them. Set `HINT_ERRORS_FORCE=1` to opt back in deliberately.
+- **Listener chaining** — `uncaughtException`/`unhandledRejection` listeners
+  registered before hint-errors loads (e.g. Sentry, Winston, APM agents) are
+  now snapshotted and re-invoked after hint-errors' own handler runs,
+  regardless of require order. Previously, whichever tool registered first
+  won the race to run — if an APM tool that calls `process.exit()` won that
+  race, hint-errors' formatted hint might never print. No listener is
+  dropped; this only guarantees ordering.
+- **`NO_COLOR` / `FORCE_COLOR` / TTY-aware color output** — ANSI color codes
+  are now only emitted when stdout is an interactive TTY, honoring the
+  `NO_COLOR` standard (no-color.org) and the `FORCE_COLOR` override.
+  Previously, color codes were written unconditionally, producing raw
+  escape-code noise when output was piped into CI logs or a log aggregator
+  (CloudWatch, Datadog, etc).
+- **Parenless and `file://` stack frame parsing (Tier 1 ESM support)** —
+  `parser.js` now also matches top-level V8 frames without a wrapping
+  function name (`at file.js:12:5`, common in native ESM and top-level
+  `await` contexts) and normalizes `file://` URL frames (native ESM) back
+  to a plain filesystem path via `node:url`'s `fileURLToPath`. Previously
+  these frame shapes silently fell through to `file: null`.
+
+### Documentation
+
+- README now documents the production safety default, listener-chaining
+  compatibility behavior, and the `NO_COLOR`/`FORCE_COLOR`/`TERM` output
+  controls.
 
 ---
 
@@ -89,6 +126,7 @@ Nothing yet — see the [1.2.0 milestone](https://github.com/ZLouisMiguel/hint-e
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.2.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.2.0
 [1.1.3]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.3
 [1.1.2]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.2
 [1.1.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.0
