@@ -9,7 +9,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/hint-errors.svg" alt="license" /></a>
 </p>
 
-
 ## Install
 
 ```bash
@@ -50,6 +49,49 @@ const server = http.createServer((req, res) => {
 
 server.listen(3000);
 ```
+
+## Production safety
+
+hint-errors is a local development aid, not a production error handler. It
+**disables itself automatically when `NODE_ENV=production`** — no listeners
+are registered at all, so it has zero effect on how your production process
+handles uncaught errors. This protects against the common footgun of
+requiring a dev tool in an entry file and forgetting to remove it before
+deploying.
+
+If you deliberately want hint-errors active in production, set:
+
+```bash
+HINT_ERRORS_FORCE=1
+```
+
+## Compatibility with error monitoring tools (Sentry, Winston, APM agents)
+
+Node calls every listener registered on `uncaughtException` and
+`unhandledRejection`, in registration order — it doesn't pick one. If your
+error-monitoring tool also registers a handler (and some, like Sentry, call
+`process.exit()` themselves), whichever tool registered first normally wins
+the race to run.
+
+To avoid that race, hint-errors snapshots any listeners already registered
+when it loads, always runs its own handler **first** regardless of require
+order, and then re-invokes those listeners afterward with the original
+error. No listener is dropped or replaced — this only guarantees hint-errors
+gets to print before another tool has a chance to terminate the process.
+
+## Output control
+
+hint-errors follows standard CLI color conventions:
+
+| Env var         | Effect                                                                         |
+| --------------- | ------------------------------------------------------------------------------ |
+| `NO_COLOR=1`    | Always disables ANSI color output, regardless of other settings                |
+| `FORCE_COLOR=1` | Forces color on, even when stdout isn't an interactive TTY (useful in CI logs) |
+| `TERM=dumb`     | Disables color, matching common terminal-capability checks                     |
+
+By default, color is only emitted when stdout is an interactive TTY — piping
+output into a file or a log aggregator (CloudWatch, Datadog, etc.) never
+receives raw escape codes.
 
 ## What's covered
 
@@ -92,9 +134,19 @@ server.listen(3000);
 - Unhandled rejection inside `async/await`
 - Missing `await` causing undefined reads
 
+### Stack trace parsing
+
+Location detection handles the common CommonJS frame shape
+(`at fn (file:line:col)`), parenless top-level frames common in native ESM
+(`at file:line:col`), and `file://` URL frames from native ESM — all
+normalized back to a plain filesystem path for display.
+
+> **Note:** bundled or minified production code (webpack, esbuild, Vite)
+> isn't source-mapped yet — reported line numbers for bundled code point at
+> the bundle, not your original source. Source map support is tracked for a
+> future release.
 
 ## Maintainers
 
 - [@ZLouisMiguel](https://github.com/ZLouisMiguel)
 - [@Kennedy](https://github.com/kawacukennedy)
-
