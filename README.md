@@ -96,3 +96,5 @@ server.listen(3000);
 ## Maintainers
 
 - [@ZLouisMiguel](https://github.com/ZLouisMiguel)
+- [@Kennedy](https://github.com/kawacukennedy)
+
