@@ -4,6 +4,54 @@
  * are surfaced — Node internals and node_modules are excluded.
  */
 
+const { fileURLToPath } = require("node:url");
+
+/**
+ * Extracts a file path and line number from a single V8 stack frame string.
+ *
+ * V8 produces frames in two shapes depending on whether the call site has a
+ * named enclosing function:
+ *  - "at Object.<anonymous> (/path/to/file.js:12:5)" — the common case
+ *  - "at /path/to/file.js:12:5" — top-level code with no function wrapper,
+ *    which is common in native ESM and top-level await contexts
+ *
+ * Native ESM frames may also report the location as a "file://" URL instead
+ * of a plain filesystem path (e.g. "file:///app/src/x.mjs:12:5", or on
+ * Windows "file:///C:/app/src/x.mjs:12:5"). Those are normalized back to a
+ * regular filesystem path via node:url's fileURLToPath so downstream code
+ * (path shortening, display) doesn't need to special-case URLs.
+ *
+ * @param {string} frame - A single line from an Error's stack property.
+ * @returns {{file: string|null, line: string|null}} The extracted location,
+ *   or nulls if the frame doesn't match either known shape.
+ */
+function extractLocation(frame) {
+  // Shape 1: "... (file:line:col)" — parenthesized location.
+  let match = frame.match(/\(([^()]+):(\d+):(\d+)\)\s*$/);
+
+  // Shape 2: "at file:line:col" — no wrapping parentheses. Only attempted
+  // when shape 1 doesn't match, so we don't misparse the common case.
+  if (!match) {
+    match = frame.match(/at\s+(?:async\s+)?(.+):(\d+):(\d+)\s*$/);
+  }
+
+  if (!match) return { file: null, line: null };
+
+  let file = match[1];
+  const line = match[2];
+
+  if (file.startsWith("file://")) {
+    try {
+      file = fileURLToPath(file);
+    } catch {
+      // Malformed URL — fall back to the raw string rather than losing
+      // the location entirely.
+    }
+  }
+
+  return { file, line };
+}
+
 /**
  * @typedef {Object} ParsedError
  * @property {string} type - The error type name (e.g. "TypeError", "ReferenceError").
@@ -63,13 +111,7 @@ function parseError(err) {
   });
 
   const firstFrame = relevantFrames[0] || "";
-
-  // Stack frame format: "    at Object.<anonymous> (/path/to/file.js:12:5)"
-  // Capture groups: 1 = file path, 2 = line number, 3 = column number
-  const match = firstFrame.match(/\((.+):(\d+):(\d+)\)/);
-
-  const file = match ? match[1] : null;
-  const line = match ? match[2] : null;
+  const { file, line } = extractLocation(firstFrame);
 
   return {
     type,
