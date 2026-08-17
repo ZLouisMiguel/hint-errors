@@ -1,6 +1,7 @@
 // test/parser.test.js
 "use strict";
 const assert = require("assert");
+const { pathToFileURL } = require("url");
 const { parseError } = require("../src/parser.js");
 
 test("extracts type and message from a TypeError", () => {
@@ -63,4 +64,51 @@ test("preserves the original value on raw", () => {
   const err = new Error("boom");
   const parsed = parseError(err);
   assert.strictEqual(parsed.raw, err);
+});
+
+test("extracts file and line from a parenless top-level frame (native ESM shape)", () => {
+  const err = new Error("boom");
+  err.stack = ["Error: boom", "    at /app/src/top-level.mjs:4:1"].join("\n");
+  const parsed = parseError(err);
+  assert.strictEqual(parsed.file, "/app/src/top-level.mjs");
+  assert.strictEqual(parsed.line, "4");
+});
+
+test("extracts file and line from a parenless async top-level frame", () => {
+  const err = new Error("boom");
+  err.stack = ["Error: boom", "    at async /app/src/handler.mjs:9:3"].join(
+    "\n",
+  );
+  const parsed = parseError(err);
+  assert.strictEqual(parsed.file, "/app/src/handler.mjs");
+  assert.strictEqual(parsed.line, "9");
+});
+
+test("normalizes a file:// URL frame back to a filesystem path (native ESM)", () => {
+  // Built via pathToFileURL/fileURLToPath so the expected path is correct
+  // on whatever platform the suite runs on (POSIX or Windows).
+  const absPath =
+    process.platform === "win32" ? "C:\\app\\src\\x.js" : "/app/src/x.js";
+  const fileUrl = pathToFileURL(absPath).href;
+
+  const err = new Error("boom");
+  err.stack = ["Error: boom", `    at ${fileUrl}:9:1`].join("\n");
+  const parsed = parseError(err);
+  assert.strictEqual(parsed.file, absPath);
+  assert.strictEqual(parsed.line, "9");
+});
+
+test("normalizes a parenthesized file:// URL frame back to a filesystem path", () => {
+  const absPath =
+    process.platform === "win32" ? "C:\\app\\src\\y.js" : "/app/src/y.js";
+  const fileUrl = pathToFileURL(absPath).href;
+
+  const err = new Error("boom");
+  err.stack = [
+    "Error: boom",
+    `    at Object.<anonymous> (${fileUrl}:2:10)`,
+  ].join("\n");
+  const parsed = parseError(err);
+  assert.strictEqual(parsed.file, absPath);
+  assert.strictEqual(parsed.line, "2");
 });
