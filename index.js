@@ -13,10 +13,31 @@
  *   - 'unhandledRejection' fires when a Promise is rejected with no .catch()
  *     or try/catch around its await.
  *
- *   Registering a handler for either event fully replaces Node's default
- *   behavior (printing the raw stack to stderr). hint-errors uses this to
- *   intercept both event types and run them through its own
- *   parse → hint → format pipeline before exiting.
+ *   hint-errors intercepts both event types, runs them through its own
+ *   parse → hint → format pipeline, and then re-invokes any listeners that
+ *   were already registered before hint-errors loaded (see "Compatibility
+ *   with error monitoring tools" below) — so require order doesn't affect
+ *   which tool's output you see first.
+ *
+ * Production safety:
+ *   hint-errors is a local development aid. When NODE_ENV=production it
+ *   disables itself by default and registers no listeners at all, so it
+ *   never affects how a production process handles uncaught errors. This
+ *   guards against the package being left in a production entry file by
+ *   accident. Set HINT_ERRORS_FORCE=1 to opt back in if you genuinely want
+ *   it active in production.
+ *
+ * Compatibility with error monitoring tools (Sentry, Winston, APM agents):
+ *   Node calls every registered 'uncaughtException'/'unhandledRejection'
+ *   listener, in registration order, whenever the event fires — it does not
+ *   automatically pick one. That means require order normally determines
+ *   which tool's handler runs first, which is fragile: if an APM tool that
+ *   calls process.exit() itself happens to run before hint-errors, our
+ *   formatted hint may never get printed. To avoid that race, hint-errors
+ *   snapshots any listeners already registered when it loads, always runs
+ *   its own handler first regardless of require order, and then re-invokes
+ *   the snapshotted listeners with the original error/reason. No listener
+ *   is dropped — this only guarantees ordering, not exclusivity.
  */
 
 const { parseError } = require("./src/parser.js");
@@ -38,30 +59,61 @@ function handle(err) {
   formatError(parsed, hint);
 }
 
-/**
- * Handles synchronous uncaught exceptions — errors that were thrown
- * somewhere in the codebase but never caught by a try/catch block.
- * The exit code is set to 1 after formatting and the process is left to
- * drain naturally instead of calling process.exit(1): calling process.exit()
- * can terminate the process before async stdout writes (e.g. when piped)
- * have flushed, silently dropping the hint. Node.js docs recommend setting
- * process.exitCode and letting the event loop drain for this reason.
- */
-process.on("uncaughtException", (err) => {
-  handle(err);
-  process.exitCode = 1;
-});
+const isProduction = process.env.NODE_ENV === "production";
+const forceEnabled =
+  process.env.HINT_ERRORS_FORCE === "1" ||
+  process.env.HINT_ERRORS_FORCE === "true";
 
-/**
- * Handles unhandled Promise rejections — Promises that were rejected
- * with no .catch() handler or try/catch around their await call.
- * The rejection reason can technically be any value, so non-Error reasons
- * are normalized into a real Error object before being passed to handle().
- * Same exit strategy as uncaughtException: set the exit code and let the
- * event loop drain so stdout is not truncated.
- */
-process.on("unhandledRejection", (reason) => {
-  const err = reason instanceof Error ? reason : new Error(String(reason));
-  handle(err);
-  process.exitCode = 1;
-});
+if (isProduction && !forceEnabled) {
+  // Disabled by default in production: register no listeners at all, so
+  // Node's own default uncaught-exception behavior (print to stderr, exit 1)
+  // is completely unaffected. This warning goes to stderr via console.warn
+  // so it doesn't get mixed into stdout-only log pipelines.
+  console.warn(
+    "\x1b[33m[hint-errors] NODE_ENV=production detected — hint-errors is disabled by default in production.\n" +
+      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.\x1b[0m",
+  );
+} else {
+  // Snapshot any listeners registered before hint-errors loaded so they can
+  // be re-invoked after our own handler runs — see "Compatibility with
+  // error monitoring tools" above.
+  const priorUncaughtListeners = process.listeners("uncaughtException").slice();
+  const priorRejectionListeners = process
+    .listeners("unhandledRejection")
+    .slice();
+
+  process.removeAllListeners("uncaughtException");
+  process.removeAllListeners("unhandledRejection");
+
+  /**
+   * Handles synchronous uncaught exceptions — errors that were thrown
+   * somewhere in the codebase but never caught by a try/catch block.
+   * The exit code is set to 1 after formatting and the process is left to
+   * drain naturally instead of calling process.exit(1): calling process.exit()
+   * can terminate the process before async stdout writes (e.g. when piped)
+   * have flushed, silently dropping the hint. Node.js docs recommend setting
+   * process.exitCode and letting the event loop drain for this reason.
+   * Any listeners that were registered before hint-errors run afterward.
+   */
+  process.on("uncaughtException", (err) => {
+    handle(err);
+    process.exitCode = 1;
+    for (const listener of priorUncaughtListeners) listener(err);
+  });
+
+  /**
+   * Handles unhandled Promise rejections — Promises that were rejected
+   * with no .catch() handler or try/catch around their await call.
+   * The rejection reason can technically be any value, so non-Error reasons
+   * are normalized into a real Error object before being passed to handle().
+   * Same exit strategy as uncaughtException: set the exit code and let the
+   * event loop drain so stdout is not truncated. Any listeners that were
+   * registered before hint-errors run afterward, with the original reason.
+   */
+  process.on("unhandledRejection", (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    handle(err);
+    process.exitCode = 1;
+    for (const listener of priorRejectionListeners) listener(reason);
+  });
+}
