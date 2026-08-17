@@ -6,20 +6,49 @@
  */
 
 /**
- * ANSI escape codes used for terminal colorization.
- * These are raw codes rather than a dependency like chalk to keep
- * hint-errors fully zero-dependency.
+ * Determines whether ANSI color output should be used, following the same
+ * conventions most CLI tools respect:
+ *  - NO_COLOR (https://no-color.org) always disables color when set to any
+ *    non-empty value, and takes precedence over everything else.
+ *  - FORCE_COLOR forces color on even when stdout isn't a TTY (useful in CI
+ *    logs or when output is piped through a color-aware pager).
+ *  - TERM=dumb disables color, matching common terminal-capability checks.
+ *  - Otherwise, color is enabled only when stdout is an interactive TTY —
+ *    piping into a file or log aggregator (CloudWatch, Datadog, etc.)
+ *    should never receive raw escape codes.
  *
- * @type {Object.<string, string>}
+ * Checked at call time (not module load time) so it reflects the current
+ * environment even if env vars or stream state change between calls.
+ *
+ * @returns {boolean} Whether ANSI color codes should be emitted.
  */
-const c = {
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  dim: "\x1b[2m",
-  bold: "\x1b[1m",
-  reset: "\x1b[0m",
-};
+function supportsColor() {
+  if (process.env.NO_COLOR) return false;
+  if (process.env.FORCE_COLOR) return true;
+  if (process.env.TERM === "dumb") return false;
+  return Boolean(process.stdout.isTTY);
+}
+
+/**
+ * Returns the ANSI escape code set to use for this render. When color
+ * support is disabled, every code is an empty string so the rest of
+ * formatError can unconditionally wrap values without branching.
+ *
+ * @returns {Object.<string, string>} Color code map, or empty strings.
+ */
+function getColors() {
+  if (!supportsColor()) {
+    return { red: "", yellow: "", cyan: "", dim: "", bold: "", reset: "" };
+  }
+  return {
+    red: "\x1b[31m",
+    yellow: "\x1b[33m",
+    cyan: "\x1b[36m",
+    dim: "\x1b[2m",
+    bold: "\x1b[1m",
+    reset: "\x1b[0m",
+  };
+}
 
 /**
  * Shortens an absolute file path to be relative to the current working
@@ -92,6 +121,7 @@ function indentLines(text, prefix) {
  * @returns {void}
  */
 function formatError(parsed, hint) {
+  const c = getColors();
   const file = shortenPath(parsed.file);
   const location = parsed.line ? `${file}: line ${parsed.line}` : file;
 
