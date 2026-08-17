@@ -1,6 +1,6 @@
 /**
  * @fileoverview Server mode entry point for hint-errors.
- * Identical to index.js but does not call process.exit(1) after handling
+ * Identical to index.js but does not set process.exitCode after handling
  * an error — the process stays alive so long-running servers continue
  * serving requests after an uncaught error in a single request handler.
  *
@@ -16,6 +16,16 @@
  *   an undefined state. Keeping the process alive is a deliberate trade-off
  *   — the developer is responsible for ensuring their server can safely
  *   continue after an error.
+ *
+ * Production safety:
+ *   Same default-off behavior as index.js — when NODE_ENV=production,
+ *   server.js registers no listeners unless HINT_ERRORS_FORCE=1 is set.
+ *   See index.js for the full rationale.
+ *
+ * Compatibility with error monitoring tools (Sentry, Winston, APM agents):
+ *   Same listener-chaining behavior as index.js — listeners registered
+ *   before this module loads are preserved and re-invoked after hint-errors'
+ *   own handler runs. See index.js for the full rationale.
  */
 
 const { parseError } = require("./src/parser.js");
@@ -36,28 +46,52 @@ function handle(err) {
   formatError(parsed, hint);
 }
 
-// Warn the developer that server mode is active so silent error survival
-// doesn't go unnoticed during development.
-console.warn(
-  "\x1b[33m[hint-errors] server mode active — " +
-    "process will stay alive after uncaught errors\x1b[0m",
-);
+const isProduction = process.env.NODE_ENV === "production";
+const forceEnabled =
+  process.env.HINT_ERRORS_FORCE === "1" ||
+  process.env.HINT_ERRORS_FORCE === "true";
 
-/**
- * Handles synchronous uncaught exceptions in server mode.
- * Shows the hint and keeps the process alive — the crashed request
- * is already dead but the server continues handling new ones.
- */
-process.on("uncaughtException", (err) => {
-  handle(err);
-});
+if (isProduction && !forceEnabled) {
+  console.warn(
+    "\x1b[33m[hint-errors] NODE_ENV=production detected — hint-errors server mode is disabled by default in production.\n" +
+      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.\x1b[0m",
+  );
+} else {
+  // Warn the developer that server mode is active so silent error survival
+  // doesn't go unnoticed during development.
+  console.warn(
+    "\x1b[33m[hint-errors] server mode active — " +
+      "process will stay alive after uncaught errors\x1b[0m",
+  );
 
-/**
- * Handles unhandled Promise rejections in server mode.
- * Non-Error rejection reasons are normalized into a real Error object
- * before being passed through the pipeline.
- */
-process.on("unhandledRejection", (reason) => {
-  const err = reason instanceof Error ? reason : new Error(String(reason));
-  handle(err);
-});
+  const priorUncaughtListeners = process.listeners("uncaughtException").slice();
+  const priorRejectionListeners = process
+    .listeners("unhandledRejection")
+    .slice();
+
+  process.removeAllListeners("uncaughtException");
+  process.removeAllListeners("unhandledRejection");
+
+  /**
+   * Handles synchronous uncaught exceptions in server mode.
+   * Shows the hint and keeps the process alive — the crashed request
+   * is already dead but the server continues handling new ones. Any
+   * listeners registered before hint-errors run afterward.
+   */
+  process.on("uncaughtException", (err) => {
+    handle(err);
+    for (const listener of priorUncaughtListeners) listener(err);
+  });
+
+  /**
+   * Handles unhandled Promise rejections in server mode.
+   * Non-Error rejection reasons are normalized into a real Error object
+   * before being passed through the pipeline. Any listeners registered
+   * before hint-errors run afterward, with the original reason.
+   */
+  process.on("unhandledRejection", (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    handle(err);
+    for (const listener of priorRejectionListeners) listener(reason);
+  });
+}
