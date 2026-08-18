@@ -50,6 +50,50 @@ const server = http.createServer((req, res) => {
 server.listen(3000);
 ```
 
+## Custom hints
+
+Register your own hints for domain-specific errors — custom Error
+subclasses, internal error codes, anything specific to your codebase —
+without forking the package:
+
+```js
+const { addHint } = require("hint-errors");
+
+addHint({
+  match: /OrderValidationError/,
+  hint: "Order failed schema validation — check the payload against orders.schema.json",
+});
+```
+
+By default, custom hints are checked **before** every built-in hint, so they
+can override a built-in match if needed. Pass `{ priority: "low" }` to only
+use your hint as a fallback, checked after all built-in hints:
+
+```js
+addHint({ match: "some fallback case", hint: "..." }, { priority: "low" });
+```
+
+Works the same way with `require("hint-errors/server")`.
+
+## TypeScript
+
+Type declarations are published alongside the package — no `@types/`
+package needed. `addHint()`, its options, and the underlying hint/error
+shapes are fully typed.
+
+## ESM support
+
+Both entry points work with `import` as well as `require`:
+
+```js
+import "hint-errors";
+import { addHint } from "hint-errors";
+```
+
+```js
+import "hint-errors/server";
+```
+
 ## Production safety
 
 hint-errors is a local development aid, not a production error handler. It
