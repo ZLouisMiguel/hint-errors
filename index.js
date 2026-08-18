@@ -41,7 +41,7 @@
  */
 
 const { parseError } = require("./src/parser.js");
-const { getHint } = require("./src/hints.js");
+const { getHint, addHint } = require("./src/hints.js");
 const { formatError } = require("./src/formatter.js");
 
 /**
@@ -117,3 +117,12 @@ if (isProduction && !forceEnabled) {
     for (const listener of priorRejectionListeners) listener(reason);
   });
 }
+
+/**
+ * Registering a custom hint always works, regardless of whether hint-errors
+ * is active in this environment (see the production guard above) — addHint
+ * only augments the shared hint list that getHint() reads from, it doesn't
+ * depend on the uncaughtException/unhandledRejection listeners being
+ * registered.
+ */
+module.exports = { addHint };
