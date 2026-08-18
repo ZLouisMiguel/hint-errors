@@ -1,14 +1,17 @@
 // test/hints.test.js
 "use strict";
 const assert = require("assert");
-const { getHint } = require("../src/hints.js");
+const { getHint, addHint } = require("../src/hints.js");
 
 test("returns a specific hint for undefined property reads", () => {
   const hint = getHint({
     type: "TypeError",
     message: "Cannot read properties of undefined (reading 'name')",
   });
-  assert.ok(/defined/.test(hint), "hint should mention the value being undefined");
+  assert.ok(
+    /defined/.test(hint),
+    "hint should mention the value being undefined",
+  );
 });
 
 test("returns a specific hint for null property reads", () => {
@@ -16,7 +19,10 @@ test("returns a specific hint for null property reads", () => {
     type: "TypeError",
     message: "Cannot read properties of null (reading 'length')",
   });
-  assert.ok(/defined/.test(hint), "hint should mention the value being undefined");
+  assert.ok(
+    /defined/.test(hint),
+    "hint should mention the value being undefined",
+  );
 });
 
 test("returns a specific hint for non-function calls", () => {
@@ -84,4 +90,81 @@ test("unhandled rejection reasons still get the generic pipeline hint", () => {
     message: "boom from a rejected promise",
   });
   assert.ok(hint.length > 0);
+});
+
+test("addHint registers a custom hint that getHint returns for a matching error", () => {
+  addHint({
+    match: "MyUniqueCustomErrorMarker12345",
+    hint: "This is a custom hint from a consuming project.",
+  });
+  const hint = getHint({
+    type: "Error",
+    message: "MyUniqueCustomErrorMarker12345 occurred",
+  });
+  assert.strictEqual(hint, "This is a custom hint from a consuming project.");
+});
+
+test("addHint with default (high) priority is checked before built-in hints", () => {
+  // "Cannot read properties of undefined" already has a built-in hint —
+  // registering a high-priority custom hint for the same text must win.
+  addHint({
+    match: "Cannot read properties of undefined",
+    hint: "OVERRIDDEN: custom hint takes priority.",
+  });
+  const hint = getHint({
+    type: "TypeError",
+    message: "Cannot read properties of undefined (reading 'x')",
+  });
+  assert.strictEqual(hint, "OVERRIDDEN: custom hint takes priority.");
+});
+
+test("addHint with low priority is only checked after built-in hints", () => {
+  addHint(
+    {
+      match: "Cannot read properties of undefined",
+      hint: "This low-priority hint should never be reached.",
+    },
+    { priority: "low" },
+  );
+  const hint = getHint({
+    type: "TypeError",
+    message: "Cannot read properties of undefined (reading 'y')",
+  });
+  assert.notStrictEqual(
+    hint,
+    "This low-priority hint should never be reached.",
+    "a low-priority hint must not shadow an existing built-in match",
+  );
+});
+
+test("addHint accepts a RegExp match", () => {
+  addHint({
+    match: /MyRegexCustomMarker\d+/,
+    hint: "Matched via a custom RegExp.",
+  });
+  const hint = getHint({
+    type: "Error",
+    message: "MyRegexCustomMarker999 happened",
+  });
+  assert.strictEqual(hint, "Matched via a custom RegExp.");
+});
+
+test("addHint throws when entry is missing", () => {
+  assert.throws(() => addHint(), TypeError);
+});
+
+test("addHint throws when match is not a string or RegExp", () => {
+  assert.throws(() => addHint({ match: 42, hint: "x" }), TypeError);
+});
+
+test("addHint throws when hint is empty or missing", () => {
+  assert.throws(() => addHint({ match: "x", hint: "" }), TypeError);
+  assert.throws(() => addHint({ match: "x" }), TypeError);
+});
+
+test("addHint throws on an invalid priority option", () => {
+  assert.throws(
+    () => addHint({ match: "x", hint: "y" }, { priority: "medium" }),
+    TypeError,
+  );
 });
