@@ -9,6 +9,36 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [1.3.0] - 2026-08-17
+
+### Added
+
+- **`addHint()` extensibility API** — consuming projects can now register
+  custom hints for their own error codes or Error subclasses without
+  forking the package: `const { addHint } = require("hint-errors")`.
+  Custom hints default to "high" priority (checked before built-in hints)
+  and can opt into "low" priority (checked only as a fallback) via
+  `addHint(entry, { priority: "low" })`. Available from both `hint-errors`
+  and `hint-errors/server`.
+- **TypeScript declarations** — `.d.ts` files are now generated from the
+  existing JSDoc via `tsc --emitDeclarationOnly` and published alongside
+  the package (`dist/`), so consumers get full type checking on `addHint()`
+  and the underlying hint/error shapes with no `@types/hint-errors` package
+  needed.
+- **Dual CJS/ESM entry points** — `import "hint-errors"` and
+  `import { addHint } from "hint-errors"` now work directly (also for
+  `hint-errors/server`), via thin `.mjs` shims that re-export the existing
+  CommonJS implementation. No `createRequire()` workaround needed in
+  `"type": "module"` projects.
+
+### Documentation
+
+- README now documents `addHint()`, TypeScript support, and ESM usage.
+
 ---
 
 ## [1.2.0] - 2026-08-17
@@ -126,6 +156,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.3.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.2.0
 [1.1.3]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.3
 [1.1.2]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.2
