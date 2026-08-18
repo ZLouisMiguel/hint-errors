@@ -57,7 +57,8 @@ This often happens with objects that have parent/child references.
 Consider using a replacer function, or a library like flatted.`,
   },
   {
-    match: /\.map is not a function|\.forEach is not a function|\.filter is not a function|\.reduce is not a function/,
+    match:
+      /\.map is not a function|\.forEach is not a function|\.filter is not a function|\.reduce is not a function/,
     hint: `You're calling an array method on something that isn't an array.
 The value is likely undefined, null, or a different type entirely.
 Add a console.log on the value just before this line to see what it actually is.`,
@@ -351,4 +352,59 @@ with console.log. The error type "${parsed.type}" usually means something
 isn't what you expected it to be at that point in the code.`;
 }
 
-module.exports = { getHint };
+/**
+ * Registers a custom hint entry so consuming projects can teach hint-errors
+ * about their own error codes (custom Error subclasses, domain-specific
+ * messages, internal error codes) without forking the package.
+ *
+ * By default the entry is inserted with "high" priority, meaning it is
+ * checked before every built-in hint — this matters because getHint() stops
+ * at the first match, so a custom hint for e.g. "OrderValidationError" needs
+ * to run before any built-in entry that might also happen to match a
+ * substring of the same message. Pass { priority: "low" } to instead only
+ * be checked as a fallback, after all built-in hints have been tried.
+ *
+ * @param {HintEntry} entry - The hint to register.
+ * @param {string|RegExp} entry.match - Text or regex tested against the
+ *   combined "ErrorType: error message" string.
+ * @param {string} entry.hint - The hint text to show when matched.
+ * @param {Object} [options]
+ * @param {"high"|"low"} [options.priority="high"] - Where to insert the
+ *   entry relative to the built-in hints. "high" is checked first (before
+ *   built-ins), "low" is checked last (after built-ins, as a fallback).
+ * @returns {void}
+ * @throws {TypeError} If entry.match isn't a string or RegExp, entry.hint
+ *   isn't a non-empty string, or options.priority isn't "high" or "low".
+ *
+ * @example
+ * const { addHint } = require("hint-errors");
+ * addHint({
+ *   match: /OrderValidationError/,
+ *   hint: "Order failed schema validation — check the payload against orders.schema.json",
+ * });
+ */
+function addHint(entry, options = {}) {
+  if (!entry || typeof entry !== "object") {
+    throw new TypeError("addHint expects a hint entry object: { match, hint }");
+  }
+  if (typeof entry.match !== "string" && !(entry.match instanceof RegExp)) {
+    throw new TypeError("addHint: entry.match must be a string or a RegExp");
+  }
+  if (typeof entry.hint !== "string" || entry.hint.length === 0) {
+    throw new TypeError("addHint: entry.hint must be a non-empty string");
+  }
+
+  const priority = options.priority ?? "high";
+  if (priority !== "high" && priority !== "low") {
+    throw new TypeError('addHint: options.priority must be "high" or "low"');
+  }
+
+  const registeredEntry = { match: entry.match, hint: entry.hint };
+  if (priority === "high") {
+    hints.unshift(registeredEntry);
+  } else {
+    hints.push(registeredEntry);
+  }
+}
+
+module.exports = { getHint, addHint };
