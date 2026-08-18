@@ -167,3 +167,20 @@ test("server mode disables itself by default when NODE_ENV=production", () => {
     "process should have exited, not stayed alive, when disabled",
   );
 });
+
+test("addHint registered through the public entry point is used for a real uncaught error", () => {
+  const script = `
+    const { addHint } = require(${indexEntry});
+    addHint({
+      match: "MyAppSpecificOrderError",
+      hint: "ORDER_HINT_MARKER: check the order payload against the schema.",
+    });
+    throw new Error("MyAppSpecificOrderError: payload missing field 'sku'");
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(
+    res.stdout.includes("ORDER_HINT_MARKER"),
+    "the custom hint registered via addHint should appear in the formatted output",
+  );
+});
