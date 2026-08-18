@@ -1,21 +1,35 @@
 {
   "name": "hint-errors",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "JavaScript errors done right",
   "main": "index.js",
+  "types": "./dist/index.d.ts",
   "type": "commonjs",
   "exports": {
-    ".": "./index.js",
-    "./server": "./server.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./index.js",
+      "import": "./index.mjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "require": "./server.js",
+      "import": "./server.mjs"
+    }
   },
   "files": [
     "index.js",
+    "index.mjs",
     "server.js",
+    "server.mjs",
     "src/",
+    "dist/",
     "README.md"
   ],
   "scripts": {
-    "test": "node test/run.js"
+    "test": "node test/run.js",
+    "build:types": "tsc",
+    "prepublishOnly": "npm run build:types && npm test"
   },
   "keywords": [
     "error",
@@ -46,5 +60,8 @@
   "homepage": "https://github.com/ZLouisMiguel/hint-errors#readme",
   "engines": {
     "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }
