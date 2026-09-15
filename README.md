@@ -9,6 +9,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/hint-errors.svg" alt="license" /></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/ZLouisMiguel/hint-errors/actions/workflows/ci.yml"><img src="https://github.com/ZLouisMiguel/hint-errors/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+</p>
+
+<p align="center">
+  <a href="https://zlouismiguel.github.io/hint-errors/"><strong>Try the interactive demo →</strong></a>
+</p>
+
 ## Install
 
 ```bash
