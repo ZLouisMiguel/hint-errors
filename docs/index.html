@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hint-errors — interactive demo</title>
+    <meta
+      name="description"
+      content="Try hint-errors in your browser: pick or type a JavaScript error and see the actual hint-matching engine in action."
+    />
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --bg: #1e1e1c;
+        --bar: #2c2c2a;
+        --code-text: #c2c0b6;
+        --dim-text: #888780;
+        --amber: #ef9f27;
+        --red: #e24b4a;
+        --yellow: #ba7517;
+        --green: #639922;
+        --white: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 40px 20px 80px;
+        background: #131311;
+        color: var(--code-text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: 760px;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      header img {
+        width: 260px;
+        max-width: 80%;
+        height: auto;
+      }
+      header p {
+        color: var(--dim-text);
+        margin: 8px 0 0;
+        font-size: 14px;
+      }
+      header a {
+        color: var(--amber);
+      }
+
+      .panel {
+        background: var(--bg);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #333;
+      }
+
+      .panel-bar {
+        background: var(--bar);
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+      }
+      .dot.red {
+        background: var(--red);
+      }
+      .dot.yellow {
+        background: var(--yellow);
+      }
+      .dot.green {
+        background: var(--green);
+      }
+      .panel-title {
+        flex: 1;
+        text-align: center;
+        font: 12px/1 monospace;
+        color: var(--dim-text);
+        margin-right: 33px; /* balances the three dots on the left */
+      }
+
+      .controls {
+        padding: 18px 18px 6px;
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        font-size: 12px;
+        color: var(--dim-text);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      select,
+      input,
+      textarea,
+      button {
+        font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+        font-size: 13.5px;
+      }
+
+      select,
+      input[type="text"],
+      textarea {
+        width: 100%;
+        background: #141412;
+        color: var(--code-text);
+        border: 1px solid #3a3a37;
+        border-radius: 6px;
+        padding: 9px 10px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 46px;
+      }
+
+      .row-two {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 12px;
+      }
+
+      button {
+        background: var(--amber);
+        color: #1a1200;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 18px;
+        font-weight: 700;
+        cursor: pointer;
+        justify-self: start;
+      }
+      button:hover {
+        filter: brightness(1.08);
+      }
+      button:active {
+        filter: brightness(0.95);
+      }
+
+      #output {
+        padding: 4px 18px 22px;
+        font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+        font-size: 13.5px;
+        min-height: 40px;
+      }
+
+      .term-block {
+        padding-top: 10px;
+      }
+      .term-row {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 10px;
+        padding: 3px 0;
+        line-height: 1.5;
+      }
+      .term-key {
+        color: var(--dim-text);
+      }
+      .term-value {
+        white-space: pre-wrap;
+      }
+      .f-red {
+        color: var(--red);
+      }
+      .f-bold {
+        color: var(--white);
+        font-weight: 700;
+      }
+      .f-yellow {
+        color: var(--yellow);
+      }
+      .f-cyan {
+        color: #4fc9d8;
+      }
+
+      .note {
+        max-width: 760px;
+        font-size: 12.5px;
+        color: var(--dim-text);
+        margin-top: 18px;
+        line-height: 1.6;
+        text-align: center;
+      }
+      .note code {
+        background: #26261f;
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--code-text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <img src="assets/logo.svg" alt="hint-errors logo" />
+        <p>
+          Pick a sample error (or write your own) and see the real
+          <code>getHint()</code> + rendering engine respond — no install needed.
+          <br />
+          <a href="https://github.com/ZLouisMiguel/hint-errors"
+            >View on GitHub</a
+          >
+          ·
+          <a href="https://www.npmjs.com/package/hint-errors">View on npm</a>
+        </p>
+      </header>
+
+      <div class="panel">
+        <div class="panel-bar">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          <span class="panel-title">node — hint-errors demo</span>
+        </div>
+
+        <div class="controls">
+          <div>
+            <label for="preset">Sample error</label>
+            <select id="preset"></select>
+          </div>
+
+          <div class="row-two">
+            <div>
+              <label for="errorType">Error type</label>
+              <input id="errorType" type="text" value="TypeError" />
+            </div>
+            <div>
+              <label for="errorMessage">Error message</label>
+              <textarea id="errorMessage"></textarea>
+            </div>
+          </div>
+
+          <button id="runBtn">Run ▶</button>
+        </div>
+
+        <div id="output"></div>
+      </div>
+
+      <p class="note">
+        This demo runs the exact <code>hints</code> array and
+        <code>getHint()</code> matching logic shipped in
+        <code>src/hints.js</code>. The one thing it can't reproduce faithfully
+        is <code>parseError()</code>'s file/line lookup — that depends on a real
+        Node.js stack trace and <code>process.cwd()</code>, so
+        <strong>location</strong> below always shows what the package itself
+        falls back to when no file is available: <code>unknown location</code>.
+      </p>
+    </div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
