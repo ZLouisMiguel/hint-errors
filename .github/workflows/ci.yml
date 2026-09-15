@@ -23,6 +23,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Upgrade npm on Node 14 (its bundled npm 6 can't read lockfileVersion 3)
+        if: matrix.node-version == '14.x'
+        run: npm install -g npm@8
+
       - name: Install
         run: npm ci
 
