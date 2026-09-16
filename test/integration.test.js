@@ -3,9 +3,18 @@
 const assert = require("assert");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { pathToFileURL } = require("url");
 
 const indexEntry = JSON.stringify(path.join(__dirname, "..", "index.js"));
 const serverEntry = JSON.stringify(path.join(__dirname, "..", "server.js"));
+// The .mjs shims are imported by file URL, which also mirrors how a bundler or
+// a "type": "module" consumer resolves the package's "import" export.
+const indexEsmEntry = JSON.stringify(
+  pathToFileURL(path.join(__dirname, "..", "index.mjs")).href,
+);
+const serverEsmEntry = JSON.stringify(
+  pathToFileURL(path.join(__dirname, "..", "server.mjs")).href,
+);
 
 // A script that requires index.js and then throws. The thrown error's message
 // is padded far past the OS pipe buffer so any truncation from a premature
@@ -182,5 +191,57 @@ test("addHint registered through the public entry point is used for a real uncau
   assert.ok(
     res.stdout.includes("ORDER_HINT_MARKER"),
     "the custom hint registered via addHint should appear in the formatted output",
+  );
+});
+
+test("ESM shim (index.mjs): import exposes addHint and handles an uncaught error", () => {
+  const script = `
+    const { addHint } = await import(${indexEsmEntry});
+    console.log("ESM_INDEX_EXPOSED " + typeof addHint);
+    throw new Error("esm boom");
+  `;
+  const res = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { encoding: "utf8" },
+  );
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(
+    res.stdout.includes("ESM_INDEX_EXPOSED function"),
+    "the index.mjs shim should expose addHint",
+  );
+  assert.ok(
+    res.stdout.includes("esm boom"),
+    "importing index.mjs should register the same uncaughtException handler",
+  );
+});
+
+test("ESM shim (server.mjs): import exposes addHint and keeps the process alive after an error", () => {
+  const script = `
+    const { addHint } = await import(${serverEsmEntry});
+    console.log("ESM_SERVER_EXPOSED " + typeof addHint);
+    setInterval(() => {}, 1000);
+    throw new Error("esm server boom");
+  `;
+  // Like the CJS server test, the child is killed by the timeout because
+  // server mode must survive the uncaught error instead of exiting.
+  const res = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { encoding: "utf8", timeout: 1500 },
+  );
+  assert.strictEqual(
+    res.status,
+    null,
+    `server mode must stay alive after an uncaught error (status was ${res.status}, signal ${res.signal})`,
+  );
+  assert.strictEqual(res.signal, "SIGTERM");
+  assert.ok(
+    res.stdout.includes("ESM_SERVER_EXPOSED function"),
+    "the server.mjs shim should expose addHint",
+  );
+  assert.ok(
+    res.stdout.includes("esm server boom"),
+    "importing server.mjs should register the same handler as server.js",
   );
 });

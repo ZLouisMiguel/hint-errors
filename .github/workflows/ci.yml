@@ -32,3 +32,50 @@ jobs:
 
       - name: Test
         run: npm test
+
+  package:
+    name: Package health (types + tarball)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build type declarations
+        run: npm run build:types
+
+      - name: Verify packed tarball contains runtime and types
+        run: |
+          npm pack --dry-run --json > packed.json
+          node -e '
+            const fs = require("fs");
+            const [pkg] = JSON.parse(fs.readFileSync("packed.json", "utf8"));
+            const files = pkg.files.map((f) => f.path);
+            const required = [
+              "README.md",
+              "index.js", "index.mjs",
+              "server.js", "server.mjs",
+              "src/hints.js", "src/parser.js", "src/formatter.js",
+              "dist/index.d.ts", "dist/server.d.ts",
+            ];
+            const missing = required.filter((f) => !files.includes(f));
+            const leaked = files.filter(
+              (f) => f.startsWith("test/") || f.startsWith("docs/"),
+            );
+            if (missing.length) {
+              throw new Error("tarball is missing: " + missing.join(", "));
+            }
+            if (leaked.length) {
+              throw new Error("tarball leaks non-published files: " + leaked.join(", "));
+            }
+            console.log("tarball OK — " + files.length + " files");
+          '
