@@ -24,6 +24,7 @@
     "server.mjs",
     "src/",
     "dist/",
+    "LICENSE",
     "README.md"
   ],
   "scripts": {
@@ -49,7 +50,7 @@
   "author": {
     "name": "Louis"
   },
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ZLouisMiguel/hint-errors.git"

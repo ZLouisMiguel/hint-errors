@@ -202,3 +202,7 @@ normalized back to a plain filesystem path for display.
 
 - [@ZLouisMiguel](https://github.com/ZLouisMiguel)
 - [@Kennedy](https://github.com/kawacukennedy)
+
+## License
+
+MIT © Louis Miguel

@@ -9,7 +9,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+- Changed the project license from ISC to MIT and added the repository `LICENSE`
+  file.
 
 ---
 
