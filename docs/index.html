@@ -1019,7 +1019,7 @@ before retrying checkout.`,
             </div>
 
             <div id="galleryRoot">
-              <!-- populated by script.js from HINTS_DATA -->
+              <!-- populated by app.js from HINTS_DATA -->
             </div>
             <p class="gallery-empty" id="galleryEmpty">
               No matching entries. Try a different search term.
@@ -1037,7 +1037,7 @@ Cannot read properties of undefined (reading 'id')</textarea
               <div class="pg-result" id="pgResult"></div>
             </div>
             <!-- This widget reads from the same HINTS_DATA array as the gallery
-           above. If src/hints.js changes, HINTS_DATA in script.js must be
+           above. If src/hints.js changes, HINTS_DATA in app.js must be
            updated to match — it is a hand-kept mirror, not a live import. -->
           </section>
 
@@ -1192,12 +1192,12 @@ Cannot read properties of undefined (reading 'id')</textarea
                     <path d="M10 8.5v3.5M10 14.5h.01" /></svg
                 ></span>
                 <div>
-                  <strong>Manual releases</strong>
+                  <strong>Manual steps</strong>
                   <span class="detail"
-                    >GitHub Release creation on tag push isn't automated yet.
-                    It's a manual step after
-                    <code>git push --follow-tags</code> and
-                    <code>npm publish</code>, and it's planned.</span
+                    >Pushing a version tag with
+                    <code>git push --follow-tags</code> creates the GitHub
+                    Release automatically. Only publishing to npm is a manual
+                    step — run <code>npm publish</code> after the tag is up.</span
                   >
                 </div>
               </li>
@@ -1231,8 +1231,7 @@ Cannot read properties of undefined (reading 'id')</textarea
           >
         </div>
         <p class="footer-meta">
-          zero runtime dependencies · 49 tests · CJS + ESM · fully typed ·
-          v1.3.0
+          zero runtime dependencies · CJS + ESM · fully typed · v1.3.0
         </p>
       </div>
     </footer>
