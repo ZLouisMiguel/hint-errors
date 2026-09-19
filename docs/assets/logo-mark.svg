@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">hint-errors mark</title>
+  <rect x="3" y="3" width="90" height="90" rx="23" fill="#1e1e1c" stroke="#41413c" stroke-width="2"/>
+  <path d="m29 34 18 15-18 15m18 0h17" fill="none" stroke="#ef9f27" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"/>
+  <path d="m72 15 4.5 10.5L87 30l-10.5 4.5L72 45l-4.5-10.5L57 30l10.5-4.5z" fill="#fcde5a"/>
+</svg>

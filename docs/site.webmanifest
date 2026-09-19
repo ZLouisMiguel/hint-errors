@@ -1,0 +1,24 @@
+{
+  "name": "hint-errors — plain-English Node.js error hints",
+  "short_name": "hint-errors",
+  "description": "Turn raw Node.js stack traces into clear, actionable hints.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1e1e1c",
+  "theme_color": "#1e1e1c",
+  "icons": [
+    {
+      "src": "assets/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
