@@ -11,6 +11,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Changed the project license from ISC to MIT and added the repository `LICENSE`
   file.
+- Changed the server entry point to flush its formatted error output and exit
+  instead of continuing after an uncaught exception.
+- Reordered overlapping hint rules so specific matches win before generic ones.
+- Applied the shared color policy to package notices as well as error output.
 
 ---
 

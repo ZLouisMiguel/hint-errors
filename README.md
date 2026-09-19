@@ -40,7 +40,9 @@ When the error is fixed, the script continues normally.
 
 ### Web servers
 
-For long-running processes, use server mode. The process stays alive after an error so a single bad request doesn't take down the whole server.
+For long-running processes, the server entry point formats the failure, flushes
+the output, and exits with code 1 so an external supervisor can restart the
+process safely. It does not keep a process alive after an uncaught exception.
 
 ```js
 require("hint-errors/server");
@@ -50,7 +52,7 @@ const http = require("http");
 const server = http.createServer((req, res) => {
   if (req.url === "/crash") {
     const user = undefined;
-    console.log(user.name); // shown but server keeps running
+    console.log(user.name); // shown, then the process exits after flushing
   }
   res.end("ok");
 });

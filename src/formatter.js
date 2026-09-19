@@ -118,9 +118,10 @@ function indentLines(text, prefix) {
  * @param {string|null} parsed.file - The absolute path to the file where the error occurred.
  * @param {string|null} parsed.line - The line number where the error occurred.
  * @param {string} hint - The developer hint string produced by getHint().
+ * @param {Function} [onComplete] - Called after stdout accepts the formatted block.
  * @returns {void}
  */
-function formatError(parsed, hint) {
+function formatError(parsed, hint, onComplete) {
   const c = getColors();
   const file = shortenPath(parsed.file);
   const location = parsed.line ? `${file}: line ${parsed.line}` : file;
@@ -142,7 +143,21 @@ function formatError(parsed, hint) {
 
     return ` ${c.dim}${paddedKey}${c.reset} ${color}${indentedValue}${c.reset} `;
   });
-  process.stdout.write("\n" + lines.join("\n") + "\n\n");
+  process.stdout.write("\n" + lines.join("\n") + "\n\n", onComplete);
 }
 
-module.exports = { formatError };
+/**
+ * Writes a package notice using the same color policy as formatted errors.
+ * Notices intentionally use stdout so hint-errors keeps its existing output
+ * stream and never causes Node's raw stderr stack to be mixed into the block.
+ *
+ * @param {string} message - The notice to write.
+ * @param {"red"|"yellow"|"cyan"|"dim"|"bold"} [color="yellow"] - ANSI color name.
+ * @returns {void}
+ */
+function writeNotice(message, color = "yellow") {
+  const c = getColors();
+  process.stdout.write(`${c[color] || ""}${message}${c.reset}\n`);
+}
+
+module.exports = { formatError, writeNotice };

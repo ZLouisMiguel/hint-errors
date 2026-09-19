@@ -42,7 +42,7 @@
 
 const { parseError } = require("./src/parser.js");
 const { getHint, addHint } = require("./src/hints.js");
-const { formatError } = require("./src/formatter.js");
+const { formatError, writeNotice } = require("./src/formatter.js");
 
 /**
  * Runs a raw error through the full hint-errors pipeline:
@@ -67,11 +67,11 @@ const forceEnabled =
 if (isProduction && !forceEnabled) {
   // Disabled by default in production: register no listeners at all, so
   // Node's own default uncaught-exception behavior (print to stderr, exit 1)
-  // is completely unaffected. This warning goes to stderr via console.warn
-  // so it doesn't get mixed into stdout-only log pipelines.
-  console.warn(
-    "\x1b[33m[hint-errors] NODE_ENV=production detected — hint-errors is disabled by default in production.\n" +
-      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.\x1b[0m",
+  // is completely unaffected. The notice follows the same color policy as
+  // formatted output and stays on stdout for consistent package output.
+  writeNotice(
+    "[hint-errors] NODE_ENV=production detected — hint-errors is disabled by default in production.\n" +
+      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.",
   );
 } else {
   // Snapshot any listeners registered before hint-errors loaded so they can

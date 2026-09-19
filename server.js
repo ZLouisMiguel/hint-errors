@@ -1,21 +1,16 @@
 /**
- * @fileoverview Server mode entry point for hint-errors.
- * Identical to index.js but does not set process.exitCode after handling
- * an error — the process stays alive so long-running servers continue
- * serving requests after an uncaught error in a single request handler.
+ * @fileoverview Safe server entry point for hint-errors.
+ * Formats an uncaught error, flushes the output, and then terminates with a
+ * non-zero exit code. It never attempts to keep a process alive after an
+ * uncaught exception, because Node.js may be in an undefined state.
  *
  * Usage:
  *   require('hint-errors/server'); // first line of your server entry file
  *
- * Only use this entry point for long-running processes like HTTP servers.
- * For scripts and short-lived processes, use require('hint-errors') instead
- * so the process exits correctly on failure.
- *
- * Warning:
- *   Node.js docs note that after an uncaughtException the process may be in
- *   an undefined state. Keeping the process alive is a deliberate trade-off
- *   — the developer is responsible for ensuring their server can safely
- *   continue after an error.
+ * This entry point is retained for compatibility with earlier releases. It
+ * now has safe termination semantics for long-running processes, allowing an
+ * external supervisor to restart the process instead of continuing inside a
+ * potentially corrupted state.
  *
  * Production safety:
  *   Same default-off behavior as index.js — when NODE_ENV=production,
@@ -30,20 +25,21 @@
 
 const { parseError } = require("./src/parser.js");
 const { getHint, addHint } = require("./src/hints.js");
-const { formatError } = require("./src/formatter.js");
+const { formatError, writeNotice } = require("./src/formatter.js");
 
 /**
- * Runs the full hint-errors pipeline on a raw error without exiting.
+ * Runs the full hint-errors pipeline on a raw error.
  * Parses the error into structured data, looks up a matching hint,
  * and renders the formatted output to the terminal.
  *
  * @param {Error} err - The error to process.
+ * @param {Function} [onComplete] - Called after stdout accepts the output.
  * @returns {void}
  */
-function handle(err) {
+function handle(err, onComplete) {
   const parsed = parseError(err);
   const hint = getHint(parsed);
-  formatError(parsed, hint);
+  formatError(parsed, hint, onComplete);
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -52,18 +48,11 @@ const forceEnabled =
   process.env.HINT_ERRORS_FORCE === "true";
 
 if (isProduction && !forceEnabled) {
-  console.warn(
-    "\x1b[33m[hint-errors] NODE_ENV=production detected — hint-errors server mode is disabled by default in production.\n" +
-      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.\x1b[0m",
+  writeNotice(
+    "[hint-errors] NODE_ENV=production detected — hint-errors server entry is disabled by default in production.\n" +
+      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.",
   );
 } else {
-  // Warn the developer that server mode is active so silent error survival
-  // doesn't go unnoticed during development.
-  console.warn(
-    "\x1b[33m[hint-errors] server mode active — " +
-      "process will stay alive after uncaught errors\x1b[0m",
-  );
-
   const priorUncaughtListeners = process.listeners("uncaughtException").slice();
   const priorRejectionListeners = process
     .listeners("unhandledRejection")
@@ -73,32 +62,37 @@ if (isProduction && !forceEnabled) {
   process.removeAllListeners("unhandledRejection");
 
   /**
-   * Handles synchronous uncaught exceptions in server mode.
-   * Shows the hint and keeps the process alive — the crashed request
-   * is already dead but the server continues handling new ones. Any
-   * listeners registered before hint-errors run afterward.
+   * Handles synchronous uncaught exceptions in the server entry.
+   * Shows the hint, waits for stdout to accept it, and exits. Continuing
+   * after an uncaught exception is unsafe because process state may be invalid.
    */
   process.on("uncaughtException", (err) => {
-    handle(err);
-    for (const listener of priorUncaughtListeners) listener(err);
+    handle(err, () => {
+      for (const listener of priorUncaughtListeners) listener(err);
+      process.exitCode = 1;
+      process.exit(1);
+    });
   });
 
   /**
-   * Handles unhandled Promise rejections in server mode.
+   * Handles unhandled Promise rejections in the server entry.
    * Non-Error rejection reasons are normalized into a real Error object
    * before being passed through the pipeline. Any listeners registered
    * before hint-errors run afterward, with the original reason.
    */
   process.on("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
-    handle(err);
-    for (const listener of priorRejectionListeners) listener(reason);
+    handle(err, () => {
+      for (const listener of priorRejectionListeners) listener(reason);
+      process.exitCode = 1;
+      process.exit(1);
+    });
   });
 }
 
 /**
  * Registering a custom hint always works, regardless of whether hint-errors
- * server mode is active in this environment (see the production guard
+ * the server entry is active in this environment (see the production guard
  * above) — addHint only augments the shared hint list that getHint() reads
  * from.
  */

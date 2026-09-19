@@ -249,7 +249,8 @@ undefined (reading 'name')
             </div>
             <p class="section-intro">
               Three steps. Which entry point you require depends on whether the
-              process should exit or keep running after an error.
+              process entry point should be used, with safe termination after an
+              uncaught error.
             </p>
 
             <div class="tabs" data-tabs="gs">
@@ -589,9 +590,9 @@ undefined (reading 'name')
               <div class="def-row">
                 <dt>require("hint-errors/server")</dt>
                 <dd>
-                  Long-running processes such as HTTP servers. Prints the hint
-                  and keeps the process alive so other in-flight requests keep
-                  being served.
+                  Compatibility entry point for long-running processes such as
+                  HTTP servers. Prints the hint, flushes stdout, and exits with
+                  code 1 so an external supervisor can restart the process.
                 </dd>
               </div>
             </div>
@@ -657,15 +658,16 @@ undefined (reading 'name')
 
             <h3 class="sub-head" id="usage-servers">Servers</h3>
             <p>
-              Use the server entry point for anything that needs to keep running
-              after a single request fails.
+              Use the server entry point when a long-running process needs the
+              same formatted diagnostics while still terminating safely after
+              an uncaught failure.
             </p>
             <div class="code-card">
               <div class="code-topbar">
                 <span class="code-label">server.js</span>
                 <button
                   class="copy-btn"
-                  data-copy='require("hint-errors/server");&#10;&#10;const http = require("http");&#10;&#10;const server = http.createServer((req, res) =&gt; {&#10;  if (req.url === "/crash") {&#10;    const user = undefined;&#10;    console.log(user.name); // hint prints, server keeps running&#10;  }&#10;  res.end("ok");&#10;});&#10;&#10;server.listen(3000);'
+                  data-copy='require("hint-errors/server");&#10;&#10;const http = require("http");&#10;&#10;const server = http.createServer((req, res) =&gt; {&#10;  if (req.url === "/crash") {&#10;    const user = undefined;&#10;    console.log(user.name); // hint prints, then exits after flushing&#10;  }&#10;  res.end("ok");&#10;});&#10;&#10;server.listen(3000);'
                 >
                   <svg
                     viewBox="0 0 16 16"
@@ -685,7 +687,7 @@ undefined (reading 'name')
 <span class="tok-kw">const</span> server = http.<span class="tok-fn">createServer</span>((req, res) =&gt; {
   <span class="tok-kw">if</span> (req.url === <span class="tok-str">"/crash"</span>) {
     <span class="tok-kw">const</span> user = <span class="tok-kw">undefined</span>;
-    console.<span class="tok-fn">log</span>(user.<span class="tok-prop">name</span>); <span class="tok-com">// hint prints, server keeps running</span>
+    console.<span class="tok-fn">log</span>(user.<span class="tok-prop">name</span>); <span class="tok-com">// hint prints, then exits after flushing</span>
   }
   res.<span class="tok-fn">end</span>(<span class="tok-str">"ok"</span>);
 });
@@ -693,9 +695,9 @@ undefined (reading 'name')
 server.<span class="tok-fn">listen</span>(<span class="tok-num">3000</span>);</code></pre>
             </div>
             <p>
-              A single bad request handler doesn't take the whole process down.
-              The crashed request is already gone, but the server keeps serving
-              everything else.
+              The formatted diagnostic is flushed before the process exits, so
+              a process supervisor can restart the server with the complete
+              hint instead of leaving a potentially corrupted process alive.
             </p>
 
             <h3 class="sub-head" id="usage-esm">ESM</h3>
@@ -889,9 +891,9 @@ before retrying checkout.`,
               <div class="def-row">
                 <dt>hint-errors/server</dt>
                 <dd>
-                  Same pipeline, but no exit. The process stays alive after an
-                  unhandled error so other requests keep being served. Also
-                  exports <code>{ addHint }</code>.
+                  Same pipeline with safe termination after the formatted output
+                  is flushed. This compatibility entry point also exports
+                  <code>{ addHint }</code>.
                 </dd>
               </div>
             </div>
@@ -1074,7 +1076,7 @@ Cannot read properties of undefined (reading 'id')</textarea
                   Both entry points check <code>NODE_ENV</code> on load. When
                   it's <code>"production"</code>, no listeners are registered,
                   so the package has zero effect on the process. A
-                  <code>console.warn</code> explains why. Set
+                  A colored notice explains why. Set
                   <code>HINT_ERRORS_FORCE=1</code> if you genuinely want it
                   active anyway.
                 </dd>
@@ -1082,13 +1084,10 @@ Cannot read properties of undefined (reading 'id')</textarea
               <div class="def-row">
                 <dt>Why it matters for servers</dt>
                 <dd>
-                  The server entry point's entire design is to keep the process
-                  alive after an uncaught error. In production, a real failure
-                  logged with a friendly hint and then silently kept running is
-                  worse than no hint at all. Node's own docs describe the
-                  process as being in a potentially undefined state after an
-                  uncaught exception, which is exactly why the production kill
-                  switch exists: so that trade-off never gets made by accident.
+                  The server entry point now terminates after flushing its
+                  diagnostic. Node's own docs describe the process as being in
+                  a potentially undefined state after an uncaught exception,
+                  so an external supervisor can restart it safely.
                 </dd>
               </div>
               <div class="def-row">
@@ -1231,7 +1230,7 @@ Cannot read properties of undefined (reading 'id')</textarea
           >
         </div>
         <p class="footer-meta">
-          zero runtime dependencies · 49 tests · CJS + ESM · fully typed ·
+          zero runtime dependencies · 56 tests · CJS + ESM · fully typed ·
           v1.3.0
         </p>
       </div>
