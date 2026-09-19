@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/assets/logo.svg" alt="hint-errors" width="600" />
+  <img src="assets/logo.svg" alt="hint-errors — plain-English hints for Node.js errors" width="720" />
 </p>
 
 <p align="center">
