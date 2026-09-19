@@ -1,9 +1,11 @@
 /**
  * @fileoverview Renders a structured error object and its hint as formatted
  * terminal output. Handles colorization, path shortening, and layout.
- * Writes directly to stdout so output is never accidentally suppressed
- * by the stderr silencing in index.js.
+ * Writes directly to stdout so output is never accidentally mixed with
+ * Node's raw stderr stack trace.
  */
+
+const fs = require("fs");
 
 /**
  * Determines whether ANSI color output should be used, following the same
@@ -121,7 +123,7 @@ function indentLines(text, prefix) {
  * @param {Function} [onComplete] - Called after stdout accepts the formatted block.
  * @returns {void}
  */
-function formatError(parsed, hint, onComplete) {
+function renderError(parsed, hint) {
   const c = getColors();
   const file = shortenPath(parsed.file);
   const location = parsed.line ? `${file}: line ${parsed.line}` : file;
@@ -143,7 +145,60 @@ function formatError(parsed, hint, onComplete) {
 
     return ` ${c.dim}${paddedKey}${c.reset} ${color}${indentedValue}${c.reset} `;
   });
-  process.stdout.write("\n" + lines.join("\n") + "\n\n", onComplete);
+  return "\n" + lines.join("\n") + "\n\n";
+}
+
+/**
+ * Formats a parsed error and writes it to stdout asynchronously.
+ * Kept for callers that can wait for the stream callback.
+ *
+ * @param {Object} parsed - The structured error object produced by parseError().
+ * @param {string} hint - The developer hint string produced by getHint().
+ * @param {Function} [onComplete] - Called after stdout accepts the formatted block.
+ * @returns {void}
+ */
+function formatError(parsed, hint, onComplete) {
+  process.stdout.write(renderError(parsed, hint), onComplete);
+}
+
+/**
+ * Writes a formatted fatal-error block to stdout before returning. This is
+ * used by process error listeners so a later listener that calls process.exit()
+ * cannot truncate the hint. A closed/unavailable stdout cannot accept the
+ * diagnostic, but must not cause a second uncaught error while handling one.
+ *
+ * @param {Object} parsed - The structured error object produced by parseError().
+ * @param {string} hint - The developer hint string produced by getHint().
+ * @returns {void}
+ */
+function formatErrorSync(parsed, hint) {
+  const output = Buffer.from(renderError(parsed, hint));
+  const stdout = process.stdout;
+  if (!Number.isInteger(stdout.fd)) {
+    try {
+      stdout.write(output.toString());
+    } catch (_error) {
+      // The original error remains the one being handled.
+    }
+    return;
+  }
+
+  let offset = 0;
+
+  try {
+    while (offset < output.length) {
+      const written = fs.writeSync(
+        stdout.fd,
+        output,
+        offset,
+        output.length - offset,
+      );
+      if (written <= 0) break;
+      offset += written;
+    }
+  } catch (_error) {
+    // The original error remains the one being handled; stdout may be closed.
+  }
 }
 
 /**
@@ -160,4 +215,4 @@ function writeNotice(message, color = "yellow") {
   process.stdout.write(`${c[color] || ""}${message}${c.reset}\n`);
 }
 
-module.exports = { formatError, writeNotice };
+module.exports = { formatError, formatErrorSync, renderError, writeNotice };

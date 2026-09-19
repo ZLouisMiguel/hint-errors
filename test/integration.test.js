@@ -141,27 +141,185 @@ test("index mode re-enables in production when HINT_ERRORS_FORCE=1", () => {
   );
 });
 
-test("index mode runs its own handler before re-invoking a pre-existing uncaughtException listener", () => {
+test("index mode preserves and naturally invokes a pre-existing once listener", () => {
   const script = `
-    process.on('uncaughtException', () => {
+    const priorListener = () => {
       console.log('CUSTOM_LISTENER_RAN');
-    });
+    };
+    process.once('uncaughtException', priorListener);
+    const registeredListener = process.listeners('uncaughtException')[0];
     require(${indexEntry});
+    if (!process.listeners('uncaughtException').includes(registeredListener)) {
+      process.exit(42);
+    }
     throw new Error("chained boom");
   `;
   const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
   assert.ok(
     res.stdout.includes("chained boom"),
     "hint-errors' own hint should still print",
   );
   assert.ok(
-    res.stdout.includes("CUSTOM_LISTENER_RAN"),
-    "the pre-existing listener should still run",
+    res.stdout.split("CUSTOM_LISTENER_RAN").length - 1 === 1,
+    "the pre-existing once listener should run exactly once",
   );
   assert.ok(
     res.stdout.indexOf("chained boom") <
       res.stdout.indexOf("CUSTOM_LISTENER_RAN"),
-    "hint-errors should run before listeners that were registered earlier, to avoid a process.exit() race",
+    "the prepended hint-errors listener should print before existing listeners",
+  );
+});
+
+test("index mode flushes its hint before a pre-existing listener exits immediately", () => {
+  const script = `
+    process.on('uncaughtException', () => process.exit(17));
+    require(${indexEntry});
+    const err = new Error("exit race");
+    err.message += " | " + "x".repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("exit race"));
+  assert.ok(res.stdout.length > 200000, "the full hint must be written before the other listener exits");
+  assert.ok(!res.stderr.includes("exit race"));
+});
+
+test("index mode flushes its hint before a later listener exits immediately", () => {
+  const script = `
+    require(${indexEntry});
+    process.on('uncaughtException', () => process.exit(17));
+    const err = new Error('later listener exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("later listener exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the later listener exits",
+  );
+  assert.ok(!res.stderr.includes("later listener exit race"));
+});
+
+test("index mode preserves pre-existing unhandledRejection listeners and their reason", () => {
+  const script = `
+    const reason = {
+      message: "original rejection reason",
+      toString() { return this.message; },
+    };
+    const priorListener = (received) => {
+      console.log(received === reason ? 'ORIGINAL_REASON_PRESERVED' : 'REASON_CHANGED');
+    };
+    process.once('unhandledRejection', priorListener);
+    const registeredListener = process.listeners('unhandledRejection')[0];
+    require(${indexEntry});
+    if (!process.listeners('unhandledRejection').includes(registeredListener)) {
+      process.exit(42);
+    }
+    Promise.reject(reason);
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("original rejection reason"));
+  assert.strictEqual(
+    res.stdout.split("ORIGINAL_REASON_PRESERVED").length - 1,
+    1,
+    "the original reason should reach the once listener exactly once",
+  );
+});
+
+test("server mode preserves and naturally invokes a pre-existing once listener", () => {
+  const script = `
+    const priorListener = () => console.log('SERVER_PRIOR_LISTENER_RAN');
+    process.once('uncaughtException', priorListener);
+    const registeredListener = process.listeners('uncaughtException')[0];
+    require(${serverEntry});
+    if (!process.listeners('uncaughtException').includes(registeredListener)) {
+      process.exit(42);
+    }
+    throw new Error('server listener boom');
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("server listener boom"));
+  assert.strictEqual(
+    res.stdout.split("SERVER_PRIOR_LISTENER_RAN").length - 1,
+    1,
+    "the pre-existing once listener should run exactly once",
+  );
+});
+
+test("server mode flushes its hint before a pre-existing listener exits immediately", () => {
+  const script = `
+    process.on('uncaughtException', () => process.exit(17));
+    require(${serverEntry});
+    const err = new Error('server exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("server exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the other listener exits",
+  );
+  assert.ok(!res.stderr.includes("server exit race"));
+});
+
+test("server mode flushes its hint before a later listener exits immediately", () => {
+  const script = `
+    require(${serverEntry});
+    process.on('uncaughtException', () => process.exit(17));
+    const err = new Error('server later listener exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("server later listener exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the later listener exits",
+  );
+  assert.ok(!res.stderr.includes("server later listener exit race"));
+});
+
+test("server mode preserves pre-existing unhandledRejection listeners and their reason", () => {
+  const script = `
+    const reason = {
+      message: 'original server rejection reason',
+      toString() { return this.message; },
+    };
+    const priorListener = (received) => {
+      console.log(received === reason ? 'SERVER_ORIGINAL_REASON_PRESERVED' : 'SERVER_REASON_CHANGED');
+    };
+    process.once('unhandledRejection', priorListener);
+    const registeredListener = process.listeners('unhandledRejection')[0];
+    require(${serverEntry});
+    if (!process.listeners('unhandledRejection').includes(registeredListener)) {
+      process.exit(42);
+    }
+    Promise.reject(reason);
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("original server rejection reason"));
+  assert.strictEqual(
+    res.stdout.split("SERVER_ORIGINAL_REASON_PRESERVED").length - 1,
+    1,
+    "the original rejection reason should reach the once listener exactly once",
   );
 });
 

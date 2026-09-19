@@ -127,11 +127,18 @@ error-monitoring tool also registers a handler (and some, like Sentry, call
 `process.exit()` themselves), whichever tool registered first normally wins
 the race to run.
 
-To avoid that race, hint-errors snapshots any listeners already registered
-when it loads, always runs its own handler **first** regardless of require
-order, and then re-invokes those listeners afterward with the original
-error. No listener is dropped or replaced — this only guarantees hint-errors
-gets to print before another tool has a chance to terminate the process.
+hint-errors adds its own handlers with `process.prependListener()`, so its
+formatted message runs before handlers that were already registered when it
+loads. It does not remove, save, or manually call other handlers: Node invokes
+each one normally and only once, preserving `once` listeners and passing the
+original error or Promise-rejection reason through unchanged.
+
+The formatted message is written synchronously to stdout on this fatal-error
+path. That small, potentially blocking write ensures a monitoring handler that
+calls `process.exit()` cannot cut off the hint. It only happens when Node has
+already reported an unhandled error; ordinary program output is unaffected.
+For Promises, this means hint-errors reacts when Node reports an unhandled
+rejection; a rejection that already has a handler is left alone.
 
 ## Output control
 

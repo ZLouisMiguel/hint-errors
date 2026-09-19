@@ -18,14 +18,13 @@
  *   See index.js for the full rationale.
  *
  * Compatibility with error monitoring tools (Sentry, Winston, APM agents):
- *   Same listener-chaining behavior as index.js — listeners registered
- *   before this module loads are preserved and re-invoked after hint-errors'
- *   own handler runs. See index.js for the full rationale.
+ *   Same additive listener behavior as index.js — other handlers stay
+ *   registered and Node invokes them normally. See index.js for details.
  */
 
 const { parseError } = require("./src/parser.js");
 const { getHint, addHint } = require("./src/hints.js");
-const { formatError, writeNotice } = require("./src/formatter.js");
+const { formatErrorSync, writeNotice } = require("./src/formatter.js");
 
 /**
  * Runs the full hint-errors pipeline on a raw error.
@@ -33,13 +32,12 @@ const { formatError, writeNotice } = require("./src/formatter.js");
  * and renders the formatted output to the terminal.
  *
  * @param {Error} err - The error to process.
- * @param {Function} [onComplete] - Called after stdout accepts the output.
  * @returns {void}
  */
-function handle(err, onComplete) {
+function handle(err) {
   const parsed = parseError(err);
   const hint = getHint(parsed);
-  formatError(parsed, hint, onComplete);
+  formatErrorSync(parsed, hint);
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -53,40 +51,35 @@ if (isProduction && !forceEnabled) {
       "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.",
   );
 } else {
-  const priorUncaughtListeners = process.listeners("uncaughtException").slice();
-  const priorRejectionListeners = process
-    .listeners("unhandledRejection")
-    .slice();
+  let exitScheduled = false;
 
-  process.removeAllListeners("uncaughtException");
-  process.removeAllListeners("unhandledRejection");
+  function scheduleExit() {
+    process.exitCode = 1;
+    if (exitScheduled) return;
+    exitScheduled = true;
+    // Let EventEmitter finish dispatching the event and allow listeners' next
+    // ticks/microtasks to run before the fatal server-mode exit.
+    setImmediate(() => process.exit(1));
+  }
 
   /**
-   * Handles synchronous uncaught exceptions in the server entry.
-   * Shows the hint, waits for stdout to accept it, and exits. Continuing
-   * after an uncaught exception is unsafe because process state may be invalid.
+   * Handles synchronous uncaught exceptions in server mode. The hint is
+   * synchronously written before other listeners run, then the process exits
+   * on the next event-loop turn unless another listener terminates it first.
    */
-  process.on("uncaughtException", (err) => {
-    handle(err, () => {
-      for (const listener of priorUncaughtListeners) listener(err);
-      process.exitCode = 1;
-      process.exit(1);
-    });
+  process.prependListener("uncaughtException", (err) => {
+    handle(err);
+    scheduleExit();
   });
 
   /**
-   * Handles unhandled Promise rejections in the server entry.
-   * Non-Error rejection reasons are normalized into a real Error object
-   * before being passed through the pipeline. Any listeners registered
-   * before hint-errors run afterward, with the original reason.
+   * Handles unhandled Promise rejections. Non-Error reasons are normalized
+   * only for formatting; other listeners receive the original reason as usual.
    */
-  process.on("unhandledRejection", (reason) => {
+  process.prependListener("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
-    handle(err, () => {
-      for (const listener of priorRejectionListeners) listener(reason);
-      process.exitCode = 1;
-      process.exit(1);
-    });
+    handle(err);
+    scheduleExit();
   });
 }
 
