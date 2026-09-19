@@ -35,12 +35,6 @@ This usually means something that was supposed to return data returned null inst
 Check where that value comes from and whether it can ever be null.`,
   },
   {
-    match: /is not a function/,
-    hint: `You're calling something as a function, but it isn't one at that point.
-This could mean: you imported the wrong thing, the function name is misspelled,
-or the variable was overwritten somewhere before this line.`,
-  },
-  {
     match: "Cannot set properties of undefined",
     hint: `You're trying to assign a property to something that doesn't exist.
 Make sure the object is initialized before you try to write to it.`,
@@ -97,6 +91,12 @@ Check your imports at the top of the file.`,
     match: "Class constructor",
     hint: `You're calling a class constructor without the 'new' keyword.
 Change your call from MyClass() to new MyClass().`,
+  },
+  {
+    match: /is not a function/,
+    hint: `You're calling something as a function, but it isn't one at that point.
+This could mean: you imported the wrong thing, the function name is misspelled,
+or the variable was overwritten somewhere before this line.`,
   },
 
   // ─── ReferenceErrors ───────────────────────────────────────────
@@ -205,15 +205,15 @@ Make sure the string is a valid URI before decoding it.`,
 
   // ─── AssertionErrors ───────────────────────────────────────────
   {
+    match: "Expected values to be strictly equal",
+    hint: `An assertion failed because the two values aren't strictly equal (===).
+Check the types as well as the values — 1 and "1" are not strictly equal.`,
+  },
+  {
     match: "AssertionError",
     hint: `An assertion in your code failed — two values that were expected to be equal weren't.
 Check the values being compared in your assert() call.
 If this is in a test, the output above should tell you what was expected vs what was received.`,
-  },
-  {
-    match: "Expected values to be strictly equal",
-    hint: `An assertion failed because the two values aren't strictly equal (===).
-Check the types as well as the values — 1 and "1" are not strictly equal.`,
   },
 
   // ─── Node / File System ────────────────────────────────────────

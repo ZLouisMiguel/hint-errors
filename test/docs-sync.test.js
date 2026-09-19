@@ -67,6 +67,11 @@ test("docs/app.js HINTS_DATA stays in sync with src/hints.js hints", () => {
     `docs gallery/playground expect ${docsHints.length} hints but src/hints.js has ${srcHints.length}. ` +
       "Update HINTS_DATA in docs/app.js when you change src/hints.js.",
   );
+  assert.deepStrictEqual(
+    Array.from(docsHints),
+    Array.from(srcHints),
+    "docs/app.js must preserve the same hint ordering as src/hints.js so specific rules stay ahead of generic ones.",
+  );
   assertMultiset(
     srcHints,
     docsHints,

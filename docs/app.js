@@ -25,10 +25,6 @@
           hint: "The value you're reading from is null, not just undefined.\nThis usually means something that was supposed to return data returned null instead.\nCheck where that value comes from and whether it can ever be null.",
         },
         {
-          match: "x.y is not a function",
-          hint: "You're calling something as a function, but it isn't one at that point.\nThis could mean: you imported the wrong thing, the function name is misspelled,\nor the variable was overwritten somewhere before this line.",
-        },
-        {
           match: "Cannot set properties of undefined",
           hint: "You're trying to assign a property to something that doesn't exist.\nMake sure the object is initialized before you try to write to it.",
         },
@@ -67,6 +63,10 @@
         {
           match: "Class constructor Foo cannot be invoked without 'new'",
           hint: "You're calling a class constructor without the 'new' keyword.\nChange your call from MyClass() to new MyClass().",
+        },
+        {
+          match: "x.y is not a function",
+          hint: "You're calling something as a function, but it isn't one at that point.\nThis could mean: you imported the wrong thing, the function name is misspelled,\nor the variable was overwritten somewhere before this line.",
         },
       ],
     },
@@ -153,12 +153,12 @@
           hint: "You passed an invalid URI to encodeURIComponent, decodeURIComponent, or a similar function.\nA common cause is a stray % character that isn't part of a valid percent-encoded sequence.\nMake sure the string is a valid URI before decoding it.",
         },
         {
-          match: "AssertionError",
-          hint: "An assertion in your code failed — two values that were expected to be equal weren't.\nCheck the values being compared in your assert() call.\nIf this is in a test, the output above should tell you what was expected vs what was received.",
-        },
-        {
           match: "Expected values to be strictly equal",
           hint: 'An assertion failed because the two values aren\'t strictly equal (===).\nCheck the types as well as the values — 1 and "1" are not strictly equal.',
+        },
+        {
+          match: "AssertionError",
+          hint: "An assertion in your code failed — two values that were expected to be equal weren't.\nCheck the values being compared in your assert() call.\nIf this is in a test, the output above should tell you what was expected vs what was received.",
         },
       ],
     },
