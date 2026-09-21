@@ -9,8 +9,33 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.3.1] - 2026-09-19
+
+### Fixed
+
+- Preserve existing `uncaughtException` and `unhandledRejection` listeners
+  instead of removing and manually replaying them. Node now dispatches each
+  event normally, preserving listener identity, `once` behavior, and the
+  original rejection reason.
+- Write fatal diagnostics synchronously to stdout before other process
+  listeners run, preventing an immediate `process.exit()` from truncating the
+  hint without mixing Node's raw stack trace into the output.
+
+### Changed
+
 - Changed the project license from ISC to MIT and added the repository `LICENSE`
   file.
+- Changed the server entry point to flush its formatted error output and exit
+  instead of continuing after an uncaught exception.
+- Reordered overlapping hint rules so specific matches win before generic ones.
+- Applied the shared color policy to package notices as well as error output.
+
+### Documentation
+
+- Clarified how process listeners are preserved and when the synchronous
+  fatal-output write occurs.
 
 ---
 
@@ -157,6 +182,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full JSDoc documentation across all source files
 - Windows-compatible path handling in `formatter.js`
 
+[1.3.1]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.3.1
 [1.3.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.3.0
 [1.2.0]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.2.0
 [1.1.3]: https://github.com/ZLouisMiguel/hint-errors/releases/tag/v1.1.3

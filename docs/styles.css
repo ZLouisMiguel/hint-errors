@@ -209,13 +209,19 @@ pre,
 }
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.55rem;
   text-decoration: none;
   color: var(--text);
   font-family: var(--mono);
   font-weight: 600;
   font-size: var(--fs-md);
+}
+.brand-mark {
+  display: block;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
 }
 .brand .dot {
   color: var(--accent);

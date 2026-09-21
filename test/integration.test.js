@@ -50,26 +50,34 @@ test("index mode exits 1 on unhandled promise rejections too", () => {
   assert.ok(res.stdout.includes("boom from a rejected promise"));
 });
 
-test("server mode stays alive after an uncaught error", () => {
+test("server entry prints the hint and exits after an uncaught error", () => {
   const script = `
     require(${serverEntry});
     setInterval(() => {}, 1000);
-    throw new Error("boom");
+    const err = new Error("server boom");
+    err.message += " | " + "x".repeat(200000);
+    throw err;
   `;
-  // The child never exits on its own (server mode survives the error), so a
-  // spawnSync timeout is what stops it. If it had exited on its own, status
-  // would be non-null — signalling the process died after the uncaught error.
   const res = spawnSync(process.execPath, ["-e", script], {
     encoding: "utf8",
-    timeout: 1500,
   });
   assert.strictEqual(
     res.status,
-    null,
-    `server mode must stay alive after an uncaught error (status was ${res.status}, signal ${res.signal})`,
+    1,
+    `server entry must exit after an uncaught error (status was ${res.status}, signal ${res.signal})`,
   );
-  assert.strictEqual(res.signal, "SIGTERM");
-  assert.ok(res.stdout.includes("boom"), "hint block should still be printed");
+  assert.ok(
+    res.stdout.includes("server boom"),
+    "hint block should still be printed",
+  );
+  assert.ok(
+    res.stdout.length > 200000,
+    `expected the formatted output to survive before exit, got ${res.stdout.length} bytes`,
+  );
+  assert.ok(
+    !res.stderr.includes("server boom"),
+    "Node's raw stack trace should not be printed alongside the formatted hint",
+  );
 });
 
 test("large output is not truncated when piped (stdout flush race)", () => {
@@ -93,16 +101,25 @@ test("index mode disables itself by default when NODE_ENV=production", () => {
   `;
   const res = spawnSync(process.execPath, ["-e", script], {
     encoding: "utf8",
-    env: { ...process.env, NODE_ENV: "production" },
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      NO_COLOR: "1",
+      FORCE_COLOR: undefined,
+    },
   });
   assert.ok(
-    !res.stdout.includes("hint"),
+    !res.stdout.includes("boom in prod"),
     "no formatted hint block should be printed when disabled in production",
   );
   assert.ok(
-    res.stderr.includes("[hint-errors]") &&
-      res.stderr.includes("disabled by default"),
-    "should warn on stderr that hint-errors is disabled in production",
+    res.stdout.includes("[hint-errors]") &&
+      res.stdout.includes("disabled by default"),
+    "should warn on stdout that hint-errors is disabled in production",
+  );
+  assert.ok(
+    !/\x1b\[/.test(res.stdout),
+    "production warning should honor NO_COLOR",
   );
   // Node's own default uncaught-exception behavior takes over: non-zero exit.
   assert.notStrictEqual(res.status, 0);
@@ -124,27 +141,185 @@ test("index mode re-enables in production when HINT_ERRORS_FORCE=1", () => {
   );
 });
 
-test("index mode runs its own handler before re-invoking a pre-existing uncaughtException listener", () => {
+test("index mode preserves and naturally invokes a pre-existing once listener", () => {
   const script = `
-    process.on('uncaughtException', () => {
+    const priorListener = () => {
       console.log('CUSTOM_LISTENER_RAN');
-    });
+    };
+    process.once('uncaughtException', priorListener);
+    const registeredListener = process.listeners('uncaughtException')[0];
     require(${indexEntry});
+    if (!process.listeners('uncaughtException').includes(registeredListener)) {
+      process.exit(42);
+    }
     throw new Error("chained boom");
   `;
   const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
   assert.ok(
     res.stdout.includes("chained boom"),
     "hint-errors' own hint should still print",
   );
   assert.ok(
-    res.stdout.includes("CUSTOM_LISTENER_RAN"),
-    "the pre-existing listener should still run",
+    res.stdout.split("CUSTOM_LISTENER_RAN").length - 1 === 1,
+    "the pre-existing once listener should run exactly once",
   );
   assert.ok(
     res.stdout.indexOf("chained boom") <
       res.stdout.indexOf("CUSTOM_LISTENER_RAN"),
-    "hint-errors should run before listeners that were registered earlier, to avoid a process.exit() race",
+    "the prepended hint-errors listener should print before existing listeners",
+  );
+});
+
+test("index mode flushes its hint before a pre-existing listener exits immediately", () => {
+  const script = `
+    process.on('uncaughtException', () => process.exit(17));
+    require(${indexEntry});
+    const err = new Error("exit race");
+    err.message += " | " + "x".repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("exit race"));
+  assert.ok(res.stdout.length > 200000, "the full hint must be written before the other listener exits");
+  assert.ok(!res.stderr.includes("exit race"));
+});
+
+test("index mode flushes its hint before a later listener exits immediately", () => {
+  const script = `
+    require(${indexEntry});
+    process.on('uncaughtException', () => process.exit(17));
+    const err = new Error('later listener exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("later listener exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the later listener exits",
+  );
+  assert.ok(!res.stderr.includes("later listener exit race"));
+});
+
+test("index mode preserves pre-existing unhandledRejection listeners and their reason", () => {
+  const script = `
+    const reason = {
+      message: "original rejection reason",
+      toString() { return this.message; },
+    };
+    const priorListener = (received) => {
+      console.log(received === reason ? 'ORIGINAL_REASON_PRESERVED' : 'REASON_CHANGED');
+    };
+    process.once('unhandledRejection', priorListener);
+    const registeredListener = process.listeners('unhandledRejection')[0];
+    require(${indexEntry});
+    if (!process.listeners('unhandledRejection').includes(registeredListener)) {
+      process.exit(42);
+    }
+    Promise.reject(reason);
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("original rejection reason"));
+  assert.strictEqual(
+    res.stdout.split("ORIGINAL_REASON_PRESERVED").length - 1,
+    1,
+    "the original reason should reach the once listener exactly once",
+  );
+});
+
+test("server mode preserves and naturally invokes a pre-existing once listener", () => {
+  const script = `
+    const priorListener = () => console.log('SERVER_PRIOR_LISTENER_RAN');
+    process.once('uncaughtException', priorListener);
+    const registeredListener = process.listeners('uncaughtException')[0];
+    require(${serverEntry});
+    if (!process.listeners('uncaughtException').includes(registeredListener)) {
+      process.exit(42);
+    }
+    throw new Error('server listener boom');
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("server listener boom"));
+  assert.strictEqual(
+    res.stdout.split("SERVER_PRIOR_LISTENER_RAN").length - 1,
+    1,
+    "the pre-existing once listener should run exactly once",
+  );
+});
+
+test("server mode flushes its hint before a pre-existing listener exits immediately", () => {
+  const script = `
+    process.on('uncaughtException', () => process.exit(17));
+    require(${serverEntry});
+    const err = new Error('server exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("server exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the other listener exits",
+  );
+  assert.ok(!res.stderr.includes("server exit race"));
+});
+
+test("server mode flushes its hint before a later listener exits immediately", () => {
+  const script = `
+    require(${serverEntry});
+    process.on('uncaughtException', () => process.exit(17));
+    const err = new Error('server later listener exit race');
+    err.message += ' | ' + 'x'.repeat(200000);
+    throw err;
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], {
+    encoding: "utf8",
+  });
+  assert.strictEqual(res.status, 17);
+  assert.ok(res.stdout.includes("server later listener exit race"));
+  assert.ok(
+    res.stdout.length > 200000,
+    "the full hint must be written before the later listener exits",
+  );
+  assert.ok(!res.stderr.includes("server later listener exit race"));
+});
+
+test("server mode preserves pre-existing unhandledRejection listeners and their reason", () => {
+  const script = `
+    const reason = {
+      message: 'original server rejection reason',
+      toString() { return this.message; },
+    };
+    const priorListener = (received) => {
+      console.log(received === reason ? 'SERVER_ORIGINAL_REASON_PRESERVED' : 'SERVER_REASON_CHANGED');
+    };
+    process.once('unhandledRejection', priorListener);
+    const registeredListener = process.listeners('unhandledRejection')[0];
+    require(${serverEntry});
+    if (!process.listeners('unhandledRejection').includes(registeredListener)) {
+      process.exit(42);
+    }
+    Promise.reject(reason);
+  `;
+  const res = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.strictEqual(res.status, 1, `expected exit code 1, got ${res.status}`);
+  assert.ok(res.stdout.includes("original server rejection reason"));
+  assert.strictEqual(
+    res.stdout.split("SERVER_ORIGINAL_REASON_PRESERVED").length - 1,
+    1,
+    "the original rejection reason should reach the once listener exactly once",
   );
 });
 
@@ -156,7 +331,12 @@ test("server mode disables itself by default when NODE_ENV=production", () => {
   `;
   const res = spawnSync(process.execPath, ["-e", script], {
     encoding: "utf8",
-    env: { ...process.env, NODE_ENV: "production" },
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      NO_COLOR: "1",
+      FORCE_COLOR: undefined,
+    },
     timeout: 1500,
   });
   assert.ok(
@@ -164,9 +344,13 @@ test("server mode disables itself by default when NODE_ENV=production", () => {
     "no formatted hint should be printed when disabled in production",
   );
   assert.ok(
-    res.stderr.includes("[hint-errors]") &&
-      res.stderr.includes("disabled by default"),
-    "should warn on stderr that hint-errors server mode is disabled in production",
+    res.stdout.includes("[hint-errors]") &&
+      res.stdout.includes("disabled by default"),
+    "should warn on stdout that hint-errors server entry is disabled in production",
+  );
+  assert.ok(
+    !/\x1b\[/.test(res.stdout),
+    "server production warning should honor NO_COLOR",
   );
   // Disabled means no listeners are registered at all, so Node's default
   // uncaught-exception behavior (crash) takes over instead of staying alive.
@@ -216,26 +400,23 @@ test("ESM shim (index.mjs): import exposes addHint and handles an uncaught error
   );
 });
 
-test("ESM shim (server.mjs): import exposes addHint and keeps the process alive after an error", () => {
+test("ESM shim (server.mjs): import exposes addHint and exits after an error", () => {
   const script = `
     const { addHint } = await import(${serverEsmEntry});
     console.log("ESM_SERVER_EXPOSED " + typeof addHint);
     setInterval(() => {}, 1000);
     throw new Error("esm server boom");
   `;
-  // Like the CJS server test, the child is killed by the timeout because
-  // server mode must survive the uncaught error instead of exiting.
   const res = spawnSync(
     process.execPath,
     ["--input-type=module", "-e", script],
-    { encoding: "utf8", timeout: 1500 },
+    { encoding: "utf8" },
   );
   assert.strictEqual(
     res.status,
-    null,
-    `server mode must stay alive after an uncaught error (status was ${res.status}, signal ${res.signal})`,
+    1,
+    `server entry must exit after an uncaught error (status was ${res.status}, signal ${res.signal})`,
   );
-  assert.strictEqual(res.signal, "SIGTERM");
   assert.ok(
     res.stdout.includes("ESM_SERVER_EXPOSED function"),
     "the server.mjs shim should expose addHint",
@@ -243,5 +424,9 @@ test("ESM shim (server.mjs): import exposes addHint and keeps the process alive 
   assert.ok(
     res.stdout.includes("esm server boom"),
     "importing server.mjs should register the same handler as server.js",
+  );
+  assert.ok(
+    !res.stderr.includes("esm server boom"),
+    "Node's raw stack trace should not be printed alongside the formatted hint",
   );
 });

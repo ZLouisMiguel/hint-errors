@@ -13,11 +13,10 @@
  *   - 'unhandledRejection' fires when a Promise is rejected with no .catch()
  *     or try/catch around its await.
  *
- *   hint-errors intercepts both event types, runs them through its own
- *   parse → hint → format pipeline, and then re-invokes any listeners that
- *   were already registered before hint-errors loaded (see "Compatibility
- *   with error monitoring tools" below) — so require order doesn't affect
- *   which tool's output you see first.
+ *   hint-errors prepends its own listeners, runs each error through its
+ *   parse → hint → format pipeline, and lets Node invoke every other
+ *   listener normally. The formatted block is written before those listeners
+ *   run, so an existing handler may still safely choose to exit.
  *
  * Production safety:
  *   hint-errors is a local development aid. When NODE_ENV=production it
@@ -34,15 +33,16 @@
  *   which tool's handler runs first, which is fragile: if an APM tool that
  *   calls process.exit() itself happens to run before hint-errors, our
  *   formatted hint may never get printed. To avoid that race, hint-errors
- *   snapshots any listeners already registered when it loads, always runs
- *   its own handler first regardless of require order, and then re-invokes
- *   the snapshotted listeners with the original error/reason. No listener
- *   is dropped — this only guarantees ordering, not exclusivity.
+ *   prepends its own listener at load time. It neither removes nor manually
+ *   calls other listeners: Node dispatches the original event to them once,
+ *   preserving their registration, once-only behavior, and original value.
+ *   The diagnostic uses a synchronous stdout write on this fatal path so a
+ *   subsequent listener that calls process.exit() cannot truncate the hint.
  */
 
 const { parseError } = require("./src/parser.js");
 const { getHint, addHint } = require("./src/hints.js");
-const { formatError } = require("./src/formatter.js");
+const { formatErrorSync, writeNotice } = require("./src/formatter.js");
 
 /**
  * Runs a raw error through the full hint-errors pipeline:
@@ -56,7 +56,7 @@ const { formatError } = require("./src/formatter.js");
 function handle(err) {
   const parsed = parseError(err);
   const hint = getHint(parsed);
-  formatError(parsed, hint);
+  formatErrorSync(parsed, hint);
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -67,54 +67,32 @@ const forceEnabled =
 if (isProduction && !forceEnabled) {
   // Disabled by default in production: register no listeners at all, so
   // Node's own default uncaught-exception behavior (print to stderr, exit 1)
-  // is completely unaffected. This warning goes to stderr via console.warn
-  // so it doesn't get mixed into stdout-only log pipelines.
-  console.warn(
-    "\x1b[33m[hint-errors] NODE_ENV=production detected — hint-errors is disabled by default in production.\n" +
-      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.\x1b[0m",
+  // is completely unaffected. The notice follows the same color policy as
+  // formatted output and stays on stdout for consistent package output.
+  writeNotice(
+    "[hint-errors] NODE_ENV=production detected — hint-errors is disabled by default in production.\n" +
+      "Set HINT_ERRORS_FORCE=1 (or HINT_ERRORS_FORCE=true) to enable it anyway.",
   );
 } else {
-  // Snapshot any listeners registered before hint-errors loaded so they can
-  // be re-invoked after our own handler runs — see "Compatibility with
-  // error monitoring tools" above.
-  const priorUncaughtListeners = process.listeners("uncaughtException").slice();
-  const priorRejectionListeners = process
-    .listeners("unhandledRejection")
-    .slice();
-
-  process.removeAllListeners("uncaughtException");
-  process.removeAllListeners("unhandledRejection");
-
   /**
-   * Handles synchronous uncaught exceptions — errors that were thrown
-   * somewhere in the codebase but never caught by a try/catch block.
-   * The exit code is set to 1 after formatting and the process is left to
-   * drain naturally instead of calling process.exit(1): calling process.exit()
-   * can terminate the process before async stdout writes (e.g. when piped)
-   * have flushed, silently dropping the hint. Node.js docs recommend setting
-   * process.exitCode and letting the event loop drain for this reason.
-   * Any listeners that were registered before hint-errors run afterward.
+   * Handles synchronous uncaught exceptions. The exit code is set after the
+   * formatted block has been synchronously written; other process listeners
+   * then receive the event normally and exactly once.
    */
-  process.on("uncaughtException", (err) => {
+  process.prependListener("uncaughtException", (err) => {
     handle(err);
     process.exitCode = 1;
-    for (const listener of priorUncaughtListeners) listener(err);
   });
 
   /**
-   * Handles unhandled Promise rejections — Promises that were rejected
-   * with no .catch() handler or try/catch around their await call.
-   * The rejection reason can technically be any value, so non-Error reasons
-   * are normalized into a real Error object before being passed to handle().
-   * Same exit strategy as uncaughtException: set the exit code and let the
-   * event loop drain so stdout is not truncated. Any listeners that were
-   * registered before hint-errors run afterward, with the original reason.
+   * Handles unhandled Promise rejections. Non-Error reasons are normalized
+   * only for formatting; Node passes the original reason unchanged to every
+   * other registered listener.
    */
-  process.on("unhandledRejection", (reason) => {
+  process.prependListener("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
     handle(err);
     process.exitCode = 1;
-    for (const listener of priorRejectionListeners) listener(reason);
   });
 }
 

@@ -22,7 +22,7 @@ npm install
 ```
 hint-errors/
 ├── index.js          # default entry – exits after hint
-├── server.js         # server mode – stays alive
+├── server.js         # server entry – formats, flushes, then exits safely
 ├── src/
 │   ├── parser.js     # extracts file, line, type from raw Error
 │   ├── hints.js      # matches errors to hints (ordered array)

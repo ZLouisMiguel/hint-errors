@@ -65,6 +65,33 @@ test("returns a specific hint for max call stack", () => {
   assert.ok(/stack|recurs/.test(hint), "hint should mention the call stack");
 });
 
+test("returns the specific strict-equality assertion hint before the generic assertion hint", () => {
+  const hint = getHint({
+    type: "AssertionError",
+    message: "Expected values to be strictly equal: 1 !== 2",
+  });
+  assert.ok(
+    /strictly equal|===/.test(hint),
+    "hint should explain strict equality rather than only mentioning assertions",
+  );
+});
+
+test("returns the specific array-method hint before the generic function hint", () => {
+  const hint = getHint({
+    type: "TypeError",
+    message: "items.map is not a function",
+  });
+  assert.ok(/array|isn't an array/i.test(hint));
+});
+
+test("returns the specific Promise-method hint before the generic function hint", () => {
+  const hint = getHint({
+    type: "TypeError",
+    message: "promise.then is not a function",
+  });
+  assert.ok(/Promise|promise/i.test(hint));
+});
+
 test("falls back to the generic hint for unmatched errors", () => {
   const hint = getHint({
     type: "Error",
